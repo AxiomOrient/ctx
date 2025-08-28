@@ -1,0 +1,29 @@
+[defaults]
+budget = 4000
+min_confidence = 0.7
+mmr_lambda = 0.7
+reply_max = 1024
+
+[paths]
+index_dir = "./.ctx/index"
+cache_dir = "./.ctx/cache"
+ontology = "src/knowledge/ontology.yaml"
+rules = "src/knowledge/rules.yaml"
+
+[ai]
+order = ["claude-cli","gemini-cli","openai"]
+
+[ai."claude-cli"]
+cmd = "claude"
+args = ["-p","{prompt}"]
+timeout_ms = 30000
+
+[ai."gemini-cli"]
+cmd = "gemini"
+args = ["-p","{prompt}"]
+timeout_ms = 30000
+
+[ai.openai]            # feature "api" 필요
+api_key_env = "OPENAI_API_KEY"
+model = "gpt-4o-mini"
+timeout_ms = 20000

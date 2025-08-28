@@ -171,7 +171,6 @@ config/production.toml
 
 # 캐시 디렉토리
 .cache/
-cache/
 
 # 빌드 아티팩트
 dist/
