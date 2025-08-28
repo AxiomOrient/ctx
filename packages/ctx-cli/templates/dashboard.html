@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}대시보드 - CtxSet{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0">
+    <div class="border-4 border-dashed border-gray-200 rounded-lg p-6">
+        <h2 class="text-2xl font-bold text-gray-900 mb-6">대시보드</h2>
+        
+        <!-- Quick Actions -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-gradient-to-r from-blue-500 to-blue-600 overflow-hidden shadow rounded-lg">
+                <div class="p-6">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <div class="w-10 h-10 bg-white bg-opacity-30 rounded-lg flex items-center justify-center">
+                                <span class="text-white text-lg">📄</span>
+                            </div>
+                        </div>
+                        <div class="ml-4 flex-1">
+                            <h3 class="text-lg font-medium text-white">문서 분류</h3>
+                            <p class="text-blue-100 text-sm">파일 업로드 또는 텍스트 입력</p>
+                        </div>
+                        <div class="ml-4">
+                            <a href="/classify" class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                                시작하기 →
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gradient-to-r from-green-500 to-green-600 overflow-hidden shadow rounded-lg">
+                <div class="p-6">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <div class="w-10 h-10 bg-white bg-opacity-30 rounded-lg flex items-center justify-center">
+                                <span class="text-white text-lg">🔧</span>
+                            </div>
+                        </div>
+                        <div class="ml-4 flex-1">
+                            <h3 class="text-lg font-medium text-white">조합 빌더</h3>
+                            <p class="text-green-100 text-sm">컨텍스트 기반 프롬프트 생성</p>
+                        </div>
+                        <div class="ml-4">
+                            <a href="/compose/builder" class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                                빌드하기 →
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gradient-to-r from-purple-500 to-purple-600 overflow-hidden shadow rounded-lg">
+                <div class="p-6">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <div class="w-10 h-10 bg-white bg-opacity-30 rounded-lg flex items-center justify-center">
+                                <span class="text-white text-lg">📚</span>
+                            </div>
+                        </div>
+                        <div class="ml-4 flex-1">
+                            <h3 class="text-lg font-medium text-white">컨텍스트</h3>
+                            <p class="text-purple-100 text-sm">저장된 문서 및 분류 결과</p>
+                        </div>
+                        <div class="ml-4">
+                            <a href="/contexts" class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                                보기 →
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Summary -->
+        <div class="bg-white shadow rounded-lg p-6 mb-8">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">시스템 현황</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-blue-600">{{ stats.total_classifications }}</div>
+                    <div class="text-sm text-gray-500">분류된 문서</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-green-600">{{ stats.total_compositions }}</div>
+                    <div class="text-sm text-gray-500">생성된 조합</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-yellow-600">{{ stats.avg_confidence|round }}%</div>
+                    <div class="text-sm text-gray-500">평균 신뢰도</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-purple-600">{{ stats.active_namespaces }}</div>
+                    <div class="text-sm text-gray-500">활성 네임스페이스</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Operations -->
+        <div class="bg-white shadow overflow-hidden sm:rounded-md">
+            <div class="px-4 py-5 sm:px-6">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">최근 작업</h3>
+                <p class="mt-1 max-w-2xl text-sm text-gray-500">최근 수행된 분류 및 조합 작업들</p>
+            </div>
+            <ul class="divide-y divide-gray-200">
+                {% for op in recent_operations %}
+                <li>
+                    <div class="px-4 py-4 sm:px-6">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    {% if op.operation_type == "classify" %}
+                                    <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                        <span class="text-blue-600 text-xs font-medium">C</span>
+                                    </div>
+                                    {% else %}
+                                    <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                                        <span class="text-green-600 text-xs font-medium">P</span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="ml-4">
+                                    <div class="text-sm font-medium text-gray-900">{{ op.title }}</div>
+                                    <div class="text-sm text-gray-500">{{ op.operation_type|title }} • {{ op.timestamp }}</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                {% if op.confidence.is_some() %}
+                                <span class="text-sm font-medium">{{ op.confidence.unwrap() }}</span>
+                                {% endif %}
+                                {% if op.operation_type == "classify" %}
+                                <button
+                                    class="text-red-600 hover:text-red-800 text-sm"
+                                    onclick="deleteDashboardDocument('{{ op.id }}', this)"
+                                >삭제</button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% if recent_operations|length == 0 %}
+            <div class="px-4 py-8 text-center">
+                <p class="text-gray-500">아직 작업 기록이 없습니다.</p>
+                <div class="mt-4">
+                    <a href="/classify" class="text-blue-600 hover:text-blue-500 font-medium">첫 번째 분류 시작하기 →</a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function deleteDashboardDocument(docId, button) {
+    if (!confirm('삭제하시겠습니까? 되돌릴 수 없습니다.')) return;
+    
+    const encodedId = encodeURIComponent(docId);
+    fetch(`/v1/documents/${encodedId}`, {
+        method: 'DELETE'
+    })
+    .then(response => {
+        if (response.ok) {
+            // 해당 리스트 아이템 제거
+            const listItem = button.closest('li');
+            if (listItem) {
+                listItem.remove();
+            }
+            showToast('문서가 삭제되었습니다.', 'success');
+        } else {
+            showToast('삭제에 실패했습니다.', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Delete error:', error);
+        showToast('삭제 중 오류가 발생했습니다.', 'error');
+    });
+}
+</script>
+{% endblock %}

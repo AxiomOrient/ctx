@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CtxSet - Context Engineering Platform{% endblock %}</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style type="text/tailwindcss">
+        .facet-badge {
+            @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+        }
+        .facet-platform { @apply bg-blue-100 text-blue-800; }
+        .facet-lang { @apply bg-green-100 text-green-800; }
+        .facet-framework { @apply bg-purple-100 text-purple-800; }
+        .facet-action { @apply bg-orange-100 text-orange-800; }
+        .facet-default { @apply bg-gray-100 text-gray-800; }
+        
+        .confidence-high { @apply text-green-600; }
+        .confidence-medium { @apply text-yellow-600; }
+        .confidence-low { @apply text-red-600; }
+        
+        .htmx-indicator {
+            opacity: 0;
+            transition: opacity 500ms ease-in;
+        }
+        .htmx-request .htmx-indicator {
+            opacity: 1;
+        }
+        .htmx-request.htmx-indicator {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <h1 class="text-xl font-bold text-gray-900">CtxSet</h1>
+                    </div>
+                    <div class="ml-10 flex items-baseline space-x-4">
+                        <a href="/" class="text-gray-900 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium">대시보드</a>
+                        <a href="/classify" class="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium">분류</a>
+                        <a href="/compose/builder" class="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium">조합 빌더</a>
+                        <a href="/contexts" class="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium">컨텍스트</a>
+                    </div>
+                </div>
+                <div class="flex items-center">
+                    <div class="relative">
+                        <button id="settings-btn" class="px-2 py-2 text-gray-600 hover:text-gray-800" onclick="toggleSettingsMenu(event)">⚙️</button>
+                        <div id="settings-menu" class="hidden absolute right-0 mt-2 w-48 bg-white border rounded shadow-md z-50">
+                            <a href="/studio/rules" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">규칙 편집</a>
+                            <a href="/studio/ontology" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">온톨로지</a>
+                            <div class="border-t border-gray-100"></div>
+                            <a href="/db" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">DB 대시보드</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main id="main" class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+    <script>
+        function toggleSettingsMenu(e) {
+            e.preventDefault();
+            const m = document.getElementById('settings-menu');
+            m.classList.toggle('hidden');
+        }
+        // Toast notification helper
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+            toast.className = `${bgColor} text-white px-4 py-2 rounded-md shadow-lg transform transition-all duration-300 translate-x-full`;
+            toast.textContent = message;
+            
+            document.getElementById('toast-container').appendChild(toast);
+            
+            // Animate in
+            setTimeout(() => toast.classList.remove('translate-x-full'), 100);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                toast.classList.add('translate-x-full');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // HTMX event listeners
+        document.body.addEventListener('htmx:responseError', function(evt) {
+            showToast('요청 처리 중 오류가 발생했습니다.', 'error');
+        });
+
+        document.body.addEventListener('htmx:afterRequest', function(evt) {
+            if (evt.detail.successful) {
+                const response = evt.detail.xhr.response;
+                if (response && response.includes('success')) {
+                    showToast('작업이 완료되었습니다.', 'success');
+                }
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+<div class="text-xs text-gray-500 mb-2">Elapsed: {{ res.elapsed_ms }} ms</div>
+<div class="overflow-auto">
+<table class="min-w-full text-xs border">
+  <thead><tr>
+    {% for c in res.columns %}<th class="p-2 text-left border-b">{{ c }}</th>{% endfor %}
+  </tr></thead>
+  <tbody>
+    {% for r in res.rows %}
+    <tr class="border-t">
+      {% for v in r %}<td class="p-2 align-top border-b">{{ v }}</td>{% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>

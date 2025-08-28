@@ -1,0 +1,104 @@
+<div class="px-4 py-6 sm:px-0">
+    <div class="border-4 border-dashed border-gray-200 rounded-lg p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold text-gray-900">📚 컨텍스트 목록</h2>
+            <div class="text-sm text-gray-500">
+                총 {{ documents|length }}개 문서
+            </div>
+        </div>
+        
+        {% if documents|length > 0 %}
+        <div class="bg-white shadow overflow-hidden sm:rounded-md">
+            <ul class="divide-y divide-gray-200">
+                {% for d in documents %}
+                <li>
+                    <div class="px-4 py-4 sm:px-6 hover:bg-gray-50 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center min-w-0 flex-1">
+                                <div class="flex-shrink-0">
+                                    <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                        <span class="text-blue-600 text-sm font-medium">📄</span>
+                                    </div>
+                                </div>
+                                <div class="ml-4 min-w-0 flex-1">
+                                    <div class="flex items-center">
+                                        <button 
+                                            hx-get="/contexts/{{ d.doc_id }}" 
+                                            hx-target="#main" 
+                                            hx-push-url="true"
+                                            class="text-sm font-medium text-blue-600 hover:text-blue-500 truncate">
+                                            {{ d.title }}
+                                        </button>
+                                    </div>
+                                    <div class="mt-1 flex items-center text-sm text-gray-500">
+                                        <span class="truncate">{{ d.doc_id }}</span>
+                                        <span class="mx-2">•</span>
+                                        <span>{{ d.uploaded_at }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <div class="text-sm">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                                        {% if d.confidence > 0.8 %}bg-green-100 text-green-800{% else if d.confidence > 0.6 %}bg-yellow-100 text-yellow-800{% else %}bg-red-100 text-red-800{% endif %}">
+                                        {{ d.confidence|round }}%
+                                    </span>
+                                </div>
+                                <button
+                                    class="text-red-600 hover:text-red-800 text-sm"
+                                    onclick="deleteDocument('{{ d.doc_id }}', this)"
+                                >삭제</button>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% else %}
+        <div class="text-center py-12">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">컨텍스트가 없습니다</h3>
+            <p class="mt-1 text-sm text-gray-500">문서를 분류하면 여기에 표시됩니다.</p>
+            <div class="mt-6">
+                <button 
+                    hx-get="/classify" 
+                    hx-target="#main" 
+                    hx-push-url="true"
+                    class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    첫 번째 문서 분류하기
+                </button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function deleteDocument(docId, button) {
+    if (!confirm('삭제하시겠습니까? 되돌릴 수 없습니다.')) return;
+    
+    const encodedId = encodeURIComponent(docId);
+    fetch(`/v1/documents/${encodedId}`, {
+        method: 'DELETE'
+    })
+    .then(response => {
+        if (response.ok) {
+            // 해당 리스트 아이템 제거
+            const listItem = button.closest('li');
+            if (listItem) {
+                listItem.remove();
+            }
+            showToast('문서가 삭제되었습니다.', 'success');
+        } else {
+            showToast('삭제에 실패했습니다.', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Delete error:', error);
+        showToast('삭제 중 오류가 발생했습니다.', 'error');
+    });
+}
+</script>

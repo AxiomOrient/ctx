@@ -1,0 +1,352 @@
+{% extends "base.html" %}
+{% block title %}조합 빌더 - CtxSet{% endblock %}
+{% block content %}
+<div class="px-4 py-6 sm:px-0">
+    <div class="border-4 border-dashed border-gray-200 rounded-lg p-6">
+        <div class="max-w-6xl mx-auto">
+            <div class="text-center mb-8">
+                <h2 class="text-3xl font-bold text-gray-900">🔧 조합 빌더</h2>
+                <p class="mt-2 text-lg text-gray-600">컨텍스트 기반 프롬프트를 생성합니다</p>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- 설정 패널 -->
+                <div class="lg:col-span-2">
+                    <form id="compose-form" hx-post="/compose/build" hx-target="#compose-result" hx-indicator="#loading" class="space-y-6">
+                        <!-- 빠른 시작 템플릿 -->
+                        <div class="bg-white shadow rounded-lg p-6">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center">
+                                ⚡ 빠른 시작
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <button type="button" onclick="applyTemplate('web-dev')" 
+                                        class="p-3 border border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 text-left transition-colors">
+                                    <div class="font-medium text-gray-900">웹 개발</div>
+                                    <div class="text-sm text-gray-500">React, TypeScript, API</div>
+                                </button>
+                                <button type="button" onclick="applyTemplate('backend')" 
+                                        class="p-3 border border-gray-300 rounded-lg hover:border-green-500 hover:bg-green-50 text-left transition-colors">
+                                    <div class="font-medium text-gray-900">백엔드 개발</div>
+                                    <div class="text-sm text-gray-500">Python, FastAPI, DB</div>
+                                </button>
+                                <button type="button" onclick="applyTemplate('mobile')" 
+                                        class="p-3 border border-gray-300 rounded-lg hover:border-purple-500 hover:bg-purple-50 text-left transition-colors">
+                                    <div class="font-medium text-gray-900">모바일 개발</div>
+                                    <div class="text-sm text-gray-500">React Native, Mobile</div>
+                                </button>
+                                <button type="button" onclick="applyTemplate('debug')" 
+                                        class="p-3 border border-gray-300 rounded-lg hover:border-red-500 hover:bg-red-50 text-left transition-colors">
+                                    <div class="font-medium text-gray-900">디버깅</div>
+                                    <div class="text-sm text-gray-500">오류 분석 및 수정</div>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 검색 및 필터 -->
+                        <div class="bg-white shadow rounded-lg p-6">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center">
+                                🔍 검색 조건
+                            </h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">키워드 검색</label>
+                                    <input type="text" name="query_text" id="query_text" 
+                                           placeholder="예: authentication, database, API, React hooks"
+                                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    <p class="text-xs text-gray-500 mt-1">관련 문서를 찾기 위한 검색어를 입력하세요</p>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">신뢰도 임계값</label>
+                                        <select name="confidence_threshold" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                            <option value="0.3">낮음 (30%)</option>
+                                            <option value="0.5" selected>보통 (50%)</option>
+                                            <option value="0.7">높음 (70%)</option>
+                                            <option value="0.9">매우 높음 (90%)</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">토큰 예산</label>
+                                        <select name="budget" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                            <option value="1000">소형 (1K 토큰)</option>
+                                            <option value="2000" selected>중형 (2K 토큰)</option>
+                                            <option value="4000">대형 (4K 토큰)</option>
+                                            <option value="8000">초대형 (8K 토큰)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 패싯 선택 -->
+                        <div class="bg-white shadow rounded-lg p-6">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center">
+                                🏷️ 기술 스택 선택
+                            </h3>
+                            <div class="space-y-6">
+                                <!-- 플랫폼 -->
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-3">플랫폼</label>
+                                    <div class="flex flex-wrap gap-2">
+                                        <label class="inline-flex items-center px-3 py-2 rounded-full border border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-colors">
+                                            <input type="checkbox" name="platform" value="web" class="sr-only">
+                                            <span class="text-sm">🌐 웹</span>
+                                        </label>
+                                        <label class="inline-flex items-center px-3 py-2 rounded-full border border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-colors">
+                                            <input type="checkbox" name="platform" value="mobile" class="sr-only">
+                                            <span class="text-sm">📱 모바일</span>
+                                        </label>
+                                        <label class="inline-flex items-center px-3 py-2 rounded-full border border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-colors">
+                                            <input type="checkbox" name="platform" value="desktop" class="sr-only">
+                                            <span class="text-sm">💻 데스크톱</span>
+                                        </label>
+                                        <label class="inline-flex items-center px-3 py-2 rounded-full border border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-colors">
+                                            <input type="checkbox" name="platform" value="api" class="sr-only">
+                                            <span class="text-sm">🔌 API</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <!-- 언어 -->
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-3">프로그래밍 언어</label>
+                                    <div class="flex flex-wrap gap-2">
+                                        <label class="inline-flex items-center px-3 py-2 rounded-full border border-gray-300 hover:border-yellow-500 hover:bg-yellow-50 cursor-pointer transition-colors">
+                                            <input type="checkbox" name="lang" value="javascript" class="sr-only">
+                                            <span class="text-sm">JavaScript</span>
+                                        </label>
+                                        <label class="inline-flex items-center px-3 py-2 rounded-full border border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-colors">
+                                            <input type="checkbox" name="lang" value="typescript" class="sr-only">
+                                            <span class="text-sm">TypeScript</span>
+                                        </label>
+                                        <label class="inline-flex items-center px-3 py-2 rounded-full border border-gray-300 hover:border-green-500 hover:bg-green-50 cursor-pointer transition-colors">
+                                            <input type="checkbox" name="lang" value="python" class="sr-only">
+                                            <span class="text-sm">Python</span>
+                                        </label>
+                                        <label class="inline-flex items-center px-3 py-2 rounded-full border border-gray-300 hover:border-orange-500 hover:bg-orange-50 cursor-pointer transition-colors">
+                                            <input type="checkbox" name="lang" value="rust" class="sr-only">
+                                            <span class="text-sm">Rust</span>
+                                        </label>
+                                        <label class="inline-flex items-center px-3 py-2 rounded-full border border-gray-300 hover:border-red-500 hover:bg-red-50 cursor-pointer transition-colors">
+                                            <input type="checkbox" name="lang" value="java" class="sr-only">
+                                            <span class="text-sm">Java</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <!-- 프레임워크 -->
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-3">프레임워크</label>
+                                    <div class="flex flex-wrap gap-2">
+                                        <label class="inline-flex items-center px-3 py-2 rounded-full border border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-colors">
+                                            <input type="checkbox" name="framework" value="react" class="sr-only">
+                                            <span class="text-sm">React</span>
+                                        </label>
+                                        <label class="inline-flex items-center px-3 py-2 rounded-full border border-gray-300 hover:border-green-500 hover:bg-green-50 cursor-pointer transition-colors">
+                                            <input type="checkbox" name="framework" value="vue" class="sr-only">
+                                            <span class="text-sm">Vue</span>
+                                        </label>
+                                        <label class="inline-flex items-center px-3 py-2 rounded-full border border-gray-300 hover:border-red-500 hover:bg-red-50 cursor-pointer transition-colors">
+                                            <input type="checkbox" name="framework" value="angular" class="sr-only">
+                                            <span class="text-sm">Angular</span>
+                                        </label>
+                                        <label class="inline-flex items-center px-3 py-2 rounded-full border border-gray-300 hover:border-green-500 hover:bg-green-50 cursor-pointer transition-colors">
+                                            <input type="checkbox" name="framework" value="django" class="sr-only">
+                                            <span class="text-sm">Django</span>
+                                        </label>
+                                        <label class="inline-flex items-center px-3 py-2 rounded-full border border-gray-300 hover:border-teal-500 hover:bg-teal-50 cursor-pointer transition-colors">
+                                            <input type="checkbox" name="framework" value="fastapi" class="sr-only">
+                                            <span class="text-sm">FastAPI</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <!-- 액션 -->
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-3">작업 유형</label>
+                                    <div class="flex flex-wrap gap-2">
+                                        <label class="inline-flex items-center px-3 py-2 rounded-full border border-gray-300 hover:border-green-500 hover:bg-green-50 cursor-pointer transition-colors">
+                                            <input type="checkbox" name="action" value="implement" class="sr-only">
+                                            <span class="text-sm">⚡ 구현</span>
+                                        </label>
+                                        <label class="inline-flex items-center px-3 py-2 rounded-full border border-gray-300 hover:border-red-500 hover:bg-red-50 cursor-pointer transition-colors">
+                                            <input type="checkbox" name="action" value="debug" class="sr-only">
+                                            <span class="text-sm">🐛 디버그</span>
+                                        </label>
+                                        <label class="inline-flex items-center px-3 py-2 rounded-full border border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-colors">
+                                            <input type="checkbox" name="action" value="optimize" class="sr-only">
+                                            <span class="text-sm">🚀 최적화</span>
+                                        </label>
+                                        <label class="inline-flex items-center px-3 py-2 rounded-full border border-gray-300 hover:border-purple-500 hover:bg-purple-50 cursor-pointer transition-colors">
+                                            <input type="checkbox" name="action" value="test" class="sr-only">
+                                            <span class="text-sm">🧪 테스트</span>
+                                        </label>
+                                        <label class="inline-flex items-center px-3 py-2 rounded-full border border-gray-300 hover:border-yellow-500 hover:bg-yellow-50 cursor-pointer transition-colors">
+                                            <input type="checkbox" name="action" value="refactor" class="sr-only">
+                                            <span class="text-sm">🔧 리팩토링</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 숨겨진 필드들 -->
+                        <input type="hidden" name="repo" value="local">
+                        <input type="hidden" name="branch" value="main">
+                        <input type="hidden" name="commit_sha" value="local">
+                        <input type="hidden" name="reserve" value="200">
+
+                        <!-- 제출 버튼 -->
+                        <div class="flex justify-center">
+                            <button type="submit" 
+                                    class="px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transform hover:scale-105 transition-all duration-200 shadow-lg">
+                                <span id="loading" class="htmx-indicator">
+                                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                </span>
+                                🚀 프롬프트 생성하기
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- 결과 패널 -->
+                <div class="lg:col-span-1">
+                    <div class="bg-white shadow rounded-lg p-6 sticky top-6">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">생성 결과</h3>
+                        <div id="compose-result">
+                            <div class="text-center py-8 text-gray-500">
+                                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                                </svg>
+                                <p class="mt-2">설정을 완료하고 생성 버튼을 클릭하세요.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 체크박스 스타일링
+document.addEventListener('DOMContentLoaded', function() {
+    const checkboxLabels = document.querySelectorAll('label:has(input[type="checkbox"])');
+    
+    checkboxLabels.forEach(label => {
+        const checkbox = label.querySelector('input[type="checkbox"]');
+        
+        checkbox.addEventListener('change', function() {
+            if (this.checked) {
+                label.classList.add('bg-blue-100', 'border-blue-500', 'text-blue-800');
+                label.classList.remove('border-gray-300');
+            } else {
+                label.classList.remove('bg-blue-100', 'border-blue-500', 'text-blue-800');
+                label.classList.add('border-gray-300');
+            }
+        });
+    });
+});
+
+// 템플릿 적용 함수
+function applyTemplate(templateName) {
+    // 모든 체크박스 초기화
+    document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.checked = false;
+        cb.dispatchEvent(new Event('change'));
+    });
+    
+    const templates = {
+        'web-dev': {
+            platform: ['web'],
+            lang: ['typescript', 'javascript'],
+            framework: ['react'],
+            action: ['implement'],
+            query: 'React TypeScript web development'
+        },
+        'backend': {
+            platform: ['api'],
+            lang: ['python'],
+            framework: ['fastapi'],
+            action: ['implement'],
+            query: 'Python FastAPI backend API'
+        },
+        'mobile': {
+            platform: ['mobile'],
+            lang: ['javascript', 'typescript'],
+            framework: ['react'],
+            action: ['implement'],
+            query: 'React Native mobile development'
+        },
+        'debug': {
+            platform: ['web', 'api'],
+            lang: ['javascript', 'python'],
+            action: ['debug'],
+            query: 'debugging error troubleshooting'
+        }
+    };
+    
+    const template = templates[templateName];
+    if (!template) return;
+    
+    // 체크박스 선택
+    Object.entries(template).forEach(([key, values]) => {
+        if (key === 'query') {
+            document.getElementById('query_text').value = values;
+            return;
+        }
+        
+        values.forEach(value => {
+            const checkbox = document.querySelector(`input[name="${key}"][value="${value}"]`);
+            if (checkbox) {
+                checkbox.checked = true;
+                checkbox.dispatchEvent(new Event('change'));
+            }
+        });
+    });
+}
+
+// 폼 제출 시 체크박스 값들을 적절히 처리
+document.getElementById('compose-form').addEventListener('htmx:configRequest', function(evt) {
+    const formData = new FormData(evt.detail.elt);
+    const facets = {};
+    
+    // 체크박스 값들을 패싯별로 그룹화
+    for (const [key, value] of formData.entries()) {
+        if (['platform', 'lang', 'framework', 'action'].includes(key)) {
+            if (!facets[key]) facets[key] = [];
+            facets[key].push(value);
+        }
+    }
+    
+    // 패싯 데이터를 JSON으로 추가
+    formData.append('facets_json', JSON.stringify(facets));
+});
+</script>
+{% endblock %}
+// Prefill facets from classification (localStorage)
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        const raw = localStorage.getItem('compose_facets');
+        if (!raw) return;
+        const facets = JSON.parse(raw);
+        // Check checkboxes matching facets
+        Object.entries(facets).forEach(([ns, values]) => {
+            values.forEach(v => {
+                const sel = `input[type="checkbox"][name="${ns}"][value="${v}"]`;
+                const cb = document.querySelector(sel);
+                if (cb && !cb.checked) {
+                    cb.checked = true;
+                    cb.dispatchEvent(new Event('change'));
+                }
+            });
+        });
+        // Notify and clear
+        if (window.showToast) showToast('분류된 패싯으로 미리 채워졌습니다.', 'info');
+        localStorage.removeItem('compose_facets');
+    } catch (_) {}
+});

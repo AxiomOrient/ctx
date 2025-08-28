@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}DB Dashboard{% endblock %}
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <h2 class="text-xl font-bold">SQLite Tables</h2>
+    <div class="flex gap-3">
+        <button 
+            onclick="refreshTables()"
+            class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            🔄 새로고침
+        </button>
+        <button 
+            onclick="clearDatabase()"
+            class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
+            🗑️ 모든 데이터 삭제
+        </button>
+    </div>
+</div>
+
+<div id="tables-container">
+    <table class="min-w-full text-sm bg-white shadow rounded-lg overflow-hidden">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="text-left p-3 font-medium text-gray-900">Table</th>
+                <th class="text-right p-3 font-medium text-gray-900">Rows</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for t in tables %}
+            <tr class="border-t hover:bg-gray-50">
+                <td class="p-3">
+                    <a hx-get="/db/table/{{ t.name }}" hx-target="#main" hx-push-url="true" class="text-blue-600 hover:underline font-medium">{{ t.name }}</a>
+                </td>
+                <td class="p-3 text-right text-gray-600">{{ t.rows }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    
+    {% if tables|length == 0 %}
+    <div class="text-center py-8 text-gray-500 bg-white rounded-lg shadow">
+        <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2 2v-5m16 0h-2M4 13h2m13-8V4a1 1 0 00-1-1H7a1 1 0 00-1 1v1m8 0V4.5" />
+        </svg>
+        <p>데이터베이스가 비어있습니다.</p>
+        <p class="text-sm mt-2">문서를 분류하거나 인덱싱하면 데이터가 표시됩니다.</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function refreshTables() {
+    htmx.ajax('GET', '/db', {target: '#main'});
+}
+
+function clearDatabase() {
+    const confirmed = confirm(
+        '⚠️ 경고: 모든 데이터베이스 내용이 완전히 삭제됩니다.\n\n' +
+        '다음 데이터가 모두 삭제됩니다:\n' +
+        '• 모든 문서 및 메타데이터\n' +
+        '• 분류 결과 및 패싯 정보\n' +
+        '• 인덱스 상태 정보\n\n' +
+        '이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?'
+    );
+    
+    if (!confirmed) return;
+    
+    const doubleConfirm = confirm(
+        '정말로 모든 데이터를 삭제하시겠습니까?\n\n' +
+        '마지막 확인입니다. "확인"을 누르면 즉시 삭제됩니다.'
+    );
+    
+    if (!doubleConfirm) return;
+    
+    // 삭제 실행
+    fetch('/v1/db/clear', {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('✅ 모든 데이터가 성공적으로 삭제되었습니다.', 'success');
+            // 페이지 새로고침
+            setTimeout(() => {
+                refreshTables();
+                // 대시보드도 업데이트 (메인 페이지에 있다면)
+                if (window.location.pathname === '/') {
+                    htmx.ajax('GET', '/', {target: '#main'});
+                }
+            }, 1000);
+        } else {
+            showToast('❌ 데이터 삭제에 실패했습니다.', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Clear database error:', error);
+        showToast('❌ 데이터 삭제 중 오류가 발생했습니다.', 'error');
+    });
+}
+</script>
+{% endblock %}

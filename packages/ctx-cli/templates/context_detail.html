@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}컨텍스트 상세{% endblock %}
+{% block content %}
+<h2 class="text-xl font-bold mb-4">컨텍스트 상세</h2>
+<div class="bg-white shadow rounded p-4">
+  <div class="mb-2 text-gray-700"><span class="font-semibold">문서 ID:</span> {{ doc.doc_id }}</div>
+  <div class="mb-2 text-gray-700"><span class="font-semibold">제목:</span> {{ doc.title }}</div>
+  <div class="mb-2 text-gray-700"><span class="font-semibold">경로:</span> {{ doc.path }}</div>
+  <div class="mb-4 text-gray-700"><span class="font-semibold">신뢰도:</span> {{ doc.confidence }}</div>
+
+  <h3 class="font-semibold mb-2">패싯</h3>
+  <div class="flex flex-wrap gap-2 mb-4">
+    {% for ns in doc.facets %}
+      <div class="border rounded px-2 py-1 text-xs">
+        <span class="font-semibold">{{ ns.0 }}:</span>
+        <span>{{ ns.1 }}</span>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="flex gap-2">
+    <button class="px-3 py-1 bg-blue-600 text-white rounded" onclick="copyText('#ctx-text')">텍스트 복사</button>
+  </div>
+</div>
+
+<h3 class="font-semibold mt-6 mb-2">원문</h3>
+{% if doc.content == "" %}
+<div class="text-sm text-red-600 mb-2">파일 내용을 읽지 못했습니다. 파일 경로가 존재하지 않거나 비어있을 수 있습니다: {{ doc.path }}</div>
+{% endif %}
+<pre id="ctx-text" class="bg-gray-50 p-3 rounded border overflow-auto text-xs">{{ doc.content }}</pre>
+
+<script>
+  function copyText(sel) {
+    const el = document.querySelector(sel);
+    if (!el) return;
+    navigator.clipboard.writeText(el.innerText).then(() => {
+      if (window.showToast) showToast('복사되었습니다.', 'success');
+    });
+  }
+  // Join filter
+  window.askama_filters = window.askama_filters || {};
+</script>
+{% endblock %}
