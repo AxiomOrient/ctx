@@ -271,6 +271,13 @@ impl Hash for CanonicalInput {
     }
 }
 
+pub fn deterministic_hash(input: &str) -> String {
+    let mut hasher = DefaultHasher::new();
+    input.hash(&mut hasher);
+    let hash = hasher.finish();
+    format!("{:016x}", hash)
+}
+
 #[cfg(test)]
 #[allow(clippy::expect_used)]
 mod tests {
@@ -473,12 +480,4 @@ mod tests {
             ("version".to_string(), "1.0".to_string())
         );
     }
-}
-
-/// Simple deterministic hash function for pipeline stage 1
-pub fn deterministic_hash(input: &str) -> String {
-    let mut hasher = DefaultHasher::new();
-    input.hash(&mut hasher);
-    let hash = hasher.finish();
-    format!("{:016x}", hash)
 }

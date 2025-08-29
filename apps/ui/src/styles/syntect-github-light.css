@@ -1,0 +1,32 @@
+/* Light theme (GitHub-ish), scoped */
+body.theme-light pre, body.theme-light code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+body.theme-light pre { background: #f6f8fa; color: #24292e; padding: 12px; border-radius: 6px; overflow: auto; }
+body.theme-light code { background: rgba(27,31,35,.05); padding: .2em .4em; border-radius: 4px; }
+body.theme-light .syn-line { display: block; white-space: pre; }
+body.theme-light [class~="comment"]      { color: #6a737d; font-style: italic; }
+body.theme-light [class~="punctuation"]  { color: #24292e; }
+body.theme-light [class~="operator"]     { color: #d73a49; }
+body.theme-light [class~="keyword"]      { color: #d73a49; font-weight: 600; }
+body.theme-light [class~="control"]      { color: #d73a49; }
+body.theme-light [class~="storage"]      { color: #d73a49; }
+body.theme-light [class~="type"]         { color: #005cc5; font-weight: 600; }
+body.theme-light [class~="builtin"]      { color: #005cc5; }
+body.theme-light [class~="function"]     { color: #6f42c1; }
+body.theme-light [class~="method"]       { color: #6f42c1; }
+body.theme-light [class~="property"]     { color: #005cc5; }
+body.theme-light [class~="variable"]     { color: #24292e; }
+body.theme-light [class~="parameter"]    { color: #24292e; }
+body.theme-light [class~="string"]       { color: #032f62; }
+body.theme-light [class~="char"]         { color: #032f62; }
+body.theme-light [class~="number"]       { color: #005cc5; }
+body.theme-light [class~="constant"]     { color: #005cc5; }
+body.theme-light [class~="boolean"]      { color: #005cc5; }
+body.theme-light [class~="namespace"]    { color: #22863a; }
+body.theme-light [class~="tag"]          { color: #22863a; }
+body.theme-light [class~="attribute"]    { color: #6f42c1; }
+body.theme-light [class~="regex"]        { color: #22863a; }
+body.theme-light [class~="escape"]       { color: #22863a; }
+body.theme-light table { border-collapse: collapse; width: 100%; }
+body.theme-light th, body.theme-light td { border: 1px solid #e1e4e8; padding: 6px 10px; }
+body.theme-light thead th { background: #f6f8fa; }
+body.theme-light blockquote { color: #6a737d; border-left: 4px solid #e1e4e8; margin: 0; padding: .5em 1em; background: #fafbfc; }

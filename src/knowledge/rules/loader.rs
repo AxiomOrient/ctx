@@ -264,8 +264,8 @@ keyword_rules:
         // 키워드 규칙이 변환되었는지 확인  
         assert!(rule_set.keywords.contains_key("platform"));
         let platform_keywords = &rule_set.keywords["platform"];
-        assert!(platform_keywords.contains(&"ios".to_string()));
-        assert!(platform_keywords.contains(&"iphone".to_string()));
+        assert!(platform_keywords.contains(&"ios|ios".to_string()));
+        assert!(platform_keywords.contains(&"iphone|ios".to_string()));
     }
 
     #[test]

@@ -1,15 +1,14 @@
-pub mod dto;
-pub mod providers;
-pub mod router;
-pub mod validation;
+#[cfg(feature = "http")] pub mod dto;
+#[cfg(feature = "http")] pub mod providers;
+#[cfg(feature = "http")] pub mod router;
+#[cfg(feature = "http")] pub mod validation;
 
-use crate::domain::{errors::Result, types::*};
+use crate::domain::errors::Result;
 
-/// Simple HTTP server placeholder
+/// Simple HTTP server stub (feature-gated)
 pub async fn run_server(_host: String, _port: u16) -> Result<()> {
-    // HTTP server requires axum and other dependencies
-    // For now, return error indicating this needs implementation
-    Err(crate::domain::errors::ContextError::ConfigError(
-        "HTTP server requires full implementation - use CLI or MCP modes instead".to_string()
-    ))
+    #[cfg(feature = "http")]
+    { router::run(_host, _port).await }
+    #[cfg(not(feature = "http"))]
+    { Err(crate::domain::errors::ContextError::ConfigError("HTTP feature disabled".to_string())) }
 }

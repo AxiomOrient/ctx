@@ -3,52 +3,83 @@ pub mod cli;
 use crate::domain::{errors::Result, types::*};
 use crate::pipeline::Pipeline;
 use crate::drivers::ai;
+use crate::config::Cfg;
 
-/// Classify text to extract facets and context requirements
-/// 
-/// This function implements a simple text classification to identify
-/// relevant facets and context requirements from the input text.
+/// Classify text using ontology and rules when available.
 pub fn classify_text(text: &str) -> Result<Vec<String>> {
-    // Simple keyword-based classification
-    // Can be enhanced with ML models later
-    let facets = text
-        .split_whitespace()
-        .filter(|word| word.len() > 2)
-        .filter(|word| !is_stop_word(word))
-        .map(|word| word.to_lowercase())
-        .collect();
-    
-    Ok(facets)
+    let mut pipeline = Pipeline::new();
+
+    // Knowledge paths
+    let ontology_path = [
+        "knowledge/ontology.yaml",
+        "ontology.yaml",
+        "src/knowledge/ontology.yaml",
+    ]
+    .into_iter()
+    .find(|p| std::path::Path::new(p).exists());
+
+    let rules_path = [
+        "knowledge/rules.yaml",
+        "rules.yaml",
+        "src/knowledge/rules.yaml",
+    ]
+    .into_iter()
+    .find(|p| std::path::Path::new(p).exists());
+
+    if ontology_path.is_some() || rules_path.is_some() {
+        pipeline = pipeline.with_knowledge(ontology_path, rules_path)?;
+    }
+
+    pipeline.stage_2_classify(text)
 }
 
 /// Compose prompt from query and available context
 /// 
 /// Executes the 7-stage pipeline with ontology and rules integration
 pub fn compose_prompt(input: ComposeInput) -> Result<PromptBundle> {
+    // Load config if present
+    let cfg = std::path::Path::new("config.toml")
+        .exists()
+        .then(|| Cfg::load("config.toml").ok())
+        .flatten();
+
     let mut pipeline = Pipeline::new();
     
-    // Try to load knowledge base (ontology + rules)
-    let ontology_path = if std::path::Path::new("knowledge/ontology.yaml").exists() {
-        Some("knowledge/ontology.yaml")
-    } else if std::path::Path::new("ontology.yaml").exists() {
-        Some("ontology.yaml")
-    } else {
-        None
-    };
-    
-    let rules_path = if std::path::Path::new("knowledge/rules.yaml").exists() {
-        Some("knowledge/rules.yaml")
-    } else if std::path::Path::new("rules.yaml").exists() {
-        Some("rules.yaml")
-    } else {
-        None
-    };
+    // Try to load knowledge base (ontology + rules) with robust search order
+    let ontology_path = [
+        "knowledge/ontology.yaml",
+        "ontology.yaml",
+        "src/knowledge/ontology.yaml",
+    ]
+    .into_iter()
+    .find(|p| std::path::Path::new(p).exists());
+
+    let rules_path = [
+        "knowledge/rules.yaml",
+        "rules.yaml",
+        "src/knowledge/rules.yaml",
+    ]
+    .into_iter()
+    .find(|p| std::path::Path::new(p).exists());
     
     // Load knowledge base if available
     if ontology_path.is_some() || rules_path.is_some() {
         pipeline = pipeline.with_knowledge(ontology_path, rules_path)?;
     }
+
+    // Apply config: docs root and mmr lambda
+    if let Some(c) = &cfg {
+        pipeline = pipeline.with_docs_root(std::path::PathBuf::from(&c.paths.docs_dir));
+        pipeline = pipeline.with_mmr_lambda(c.defaults.mmr_lambda);
+    }
     
+    // Fill defaults from config if not provided
+    let input = if let Some(c) = &cfg {
+        if input.max_tokens.is_none() {
+            ComposeInput { max_tokens: Some(c.defaults.budget as u32), ..input }
+        } else { input }
+    } else { input };
+
     pipeline.execute(input)
 }
 
@@ -85,9 +116,4 @@ pub async fn work(input: WorkInput) -> Result<WorkOutput> {
 }
 
 // Helper function for classification
-fn is_stop_word(word: &str) -> bool {
-    matches!(word.to_lowercase().as_str(), 
-        "the" | "a" | "an" | "and" | "or" | "but" | "in" | "on" | "at" | "to" | "for" | 
-        "of" | "with" | "by" | "is" | "are" | "was" | "were" | "be" | "been" | "have" | 
-        "has" | "had" | "do" | "does" | "did" | "will" | "would" | "could" | "should")
-}
+// No stop-word filtering at this layer; classification relies on knowledge/rules

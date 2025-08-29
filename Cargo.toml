@@ -4,12 +4,16 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-default = ["mcp"]
+default = ["mcp_sdk"]
 http = ["axum", "axum-extra", "tokio-stream", "tower-http", "askama"]
 api = ["reqwest"]
 embeddings = ["tokenizers"] # Using tokenizers as a proxy for embeddings feature
-mcp = []
 db_write = []
+legacy-compat = []
+mcp_sdk = ["rmcp"]
+ui_ipc = []
+ui_render_rust = ["comrak", "syntect", "ammonia"]
+ui_tauri = ["ui_ipc", "tauri", "tauri-plugin-dialog", "notify"]
 
 [dependencies]
 # Core
@@ -26,11 +30,12 @@ ahash = "0.8.11"
 lru = "0.12.3"
 tempfile = "3.10.1"
 async-trait = "0.1"
-time = { version = "0.3", features = ["macros","parsing","formatting"] }
+time = { version = "0.3", features = ["macros", "parsing", "formatting"] }
 
 # Async & I/O
 tokio = { version = "1", features = ["full"] }
 tokio-stream = { version = "0.1", optional = true }
+notify = { version = "6", optional = true }
 
 
 # Database
@@ -55,12 +60,25 @@ askama = { version = "0.14.0", features = ["serde_json"], optional = true }
 reqwest = { version = "0.12", features = ["json", "gzip", "brotli", "deflate"], optional = true }
 
 # Token counting (optional)
-tokenizers = { version = "0.19", default-features = false, features=["onig"], optional = true }
+tokenizers = { version = "0.19", default-features = false, features= ["onig"], optional = true }
 chrono = "0.4.41"
 sha2 = "0.10.9"
+rmcp = { git = "https://github.com/modelcontextprotocol/rust-sdk", package = "rmcp", optional = true, features = ["server", "macros", "transport-io", "schemars"] }
+html-escape = "0.2"
+comrak = { version = "0.24", optional = true }
+syntect = { version = "5.2", optional = true, default-features = false, features = ["parsing", "html"] }
+ammonia = { version = "3.3", optional = true }
+tauri = { version = "2", optional = true, default-features = false, features = ["wry"] }
+tauri-plugin-dialog = { version = "2", optional = true }
 
 
 [profile.release]
 lto = true
 codegen-units = 1
 strip = true
+
+[dev-dependencies]
+futures = "0.3"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }

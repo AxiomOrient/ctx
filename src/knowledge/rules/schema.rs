@@ -121,14 +121,15 @@ impl YamlRuleSet {
                 .push(pattern_with_value);
         }
 
-        // 키워드 규칙 변환
+        // 키워드 규칙 변환: "keyword|value" 형식으로 저장하여 값 정규화 가능
         for rule in &self.keyword_rules {
             for keyword in &rule.keywords {
+                let pair = format!("{}|{}", keyword, rule.value);
                 rule_set
                     .keywords
                     .entry(rule.ns.clone())
                     .or_default()
-                    .push(keyword.clone());
+                    .push(pair);
             }
         }
 
@@ -143,7 +144,19 @@ impl YamlRuleSet {
             }
         }
 
-        // TODO: codefence_rules 처리 (필요시 추가)
+        // 코드펜스 규칙 변환: 언어 이름으로 코드펜스 감지 정규식 생성
+        for rule in &self.codefence_rules {
+            for lang in &rule.languages {
+                // 멀티라인 플래그, 시작줄 ```lang 매치
+                let pattern = format!(r"(?m)^```\s*{}\b", regex::escape(lang));
+                let pattern_with_value = format!("{}|{}", pattern, rule.value);
+                rule_set
+                    .regexes
+                    .entry(rule.ns.clone())
+                    .or_default()
+                    .push(pattern_with_value);
+            }
+        }
 
         rule_set
     }

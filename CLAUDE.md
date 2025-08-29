@@ -28,13 +28,13 @@ cargo fmt --all --check
 cargo install --path .
 
 # Run CLI commands
-ctxset index-repo                          # Index repository incrementally
-ctxset index-repo --full                   # Full reindex
-ctxset build --tags "rust,api" --budget 4000  # Build prompt with constraints
-ctxset search --tags "rust,backend"        # Search documents
-ctxset validate                            # Validate context documents
-ctxset validate --fix                      # Auto-fix validation errors
-ctxset graph                               # Analyze dependency graph
+ctx index-repo                          # Index repository incrementally
+ctx index-repo --full                   # Full reindex
+ctx build --tags "rust,api" --budget 4000  # Build prompt with constraints
+ctx search --tags "rust,backend"        # Search documents
+ctx validate                            # Validate context documents
+ctx validate --fix                      # Auto-fix validation errors
+ctx graph                               # Analyze dependency graph
 ```
 
 ### Feature Flags
@@ -46,7 +46,7 @@ The project uses Cargo feature flags for optional functionality:
 
 ## Architecture Overview
 
-CtxSet is a Rust-based AI context management tool with a **lean layered architecture** enforcing strict unidirectional dependencies:
+ctx is a Rust-based AI context management tool with a **lean layered architecture** enforcing strict unidirectional dependencies:
 
 ```
 common → knowledge → doc → core → data → app
@@ -80,7 +80,7 @@ common → knowledge → doc → core → data → app
 ```bash
 # Start webhook server
 export CTX_HOOK_TOKEN="your-secret-token"
-ctxset server --port 3000
+ctx server --port 3000
 
 # Test endpoints: /v1/hooks/linear, /v1/hooks/jira, /v1/hooks/github
 ```
@@ -88,7 +88,7 @@ ctxset server --port 3000
 ### MCP (Model Context Protocol) Server
 ```bash
 # Start MCP server (stdio-based JSON-RPC)
-ctxset mcp
+ctx mcp
 
 # Supported methods: ping, classifyText, composePrompt, listContexts, getContext
 ```

@@ -14,7 +14,7 @@ pub fn run_validate(args: ValidateArgs) -> Result<()> {
     println!("✓ Validating file: {}", args.file.display());
     
     let content = std::fs::read_to_string(&args.file)
-        .map_err(|e| crate::domain::errors::ContextError::Io(e))?;
+        .map_err(crate::domain::errors::ContextError::Io)?;
     
     // Basic validation checks
     let mut errors = Vec::new();
@@ -23,16 +23,13 @@ pub fn run_validate(args: ValidateArgs) -> Result<()> {
     // Check for frontmatter
     if !content.starts_with("---") {
         errors.push("Missing frontmatter delimiter");
-    } else {
-        // Check for closing delimiter
-        if content[3..].find("---").is_none() {
+    } else if let Some(rest) = content.strip_prefix("---") {
+        if !rest.contains("---") {
             errors.push("Missing closing frontmatter delimiter");
         } else {
-            // Try to parse as YAML
-            let end_pos = content[3..].find("---").unwrap() + 3;
-            let frontmatter = &content[3..end_pos];
-            
-            if let Err(_) = serde_yaml::from_str::<serde_json::Value>(frontmatter) {
+            let end_pos = rest.find("---").unwrap();
+            let frontmatter = &rest[..end_pos];
+            if serde_yaml::from_str::<serde_json::Value>(frontmatter).is_err() {
                 errors.push("Invalid YAML syntax in frontmatter");
             }
         }

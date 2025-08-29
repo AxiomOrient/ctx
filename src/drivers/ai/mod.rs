@@ -1,12 +1,11 @@
 use crate::domain::{errors::Result, types::*};
 
 /// AI Transport plugin system with fallback chains
-/// 
+///
 /// PLAN.md specification:
 /// - Plugin-based architecture for multiple AI providers
 /// - Fallback chains for reliability
 /// - Provider selection via configuration or runtime parameters
-
 pub async fn send_prompt(
     prompt: AiPrompt, 
     provider: Option<String>, 

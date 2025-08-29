@@ -1,5 +1,5 @@
 use crate::domain::constants::parsing::HEADER_PREFIX;
-use crate::domain::types::{ContextDocument, ExtractedSection, SectionDef};
+use crate::domain::types::{ContextDocument, ExtractedSection};
 use crate::domain::errors::Result;
 
 /// 섹션 추출기 - extractor/section.rs 기능 구현
@@ -101,7 +101,7 @@ mod tests {
             },
         ];
 
-        let content = "# Test Document\\n\\n## Introduction\\nThis is the introduction section.\\nIt has multiple lines.\\n\\n## Details\\nThis is the details section.\\n\\n## Not Defined\\nThis section is not in the document definition.\\n";
+        let content = "# Test Document\n\n## Introduction\nThis is the introduction section.\nIt has multiple lines.\n\n## Details\nThis is the details section.\n\n## Not Defined\nThis section is not in the document definition.\n";
 
         let extractor = SectionExtractor::new();
         let sections = extractor

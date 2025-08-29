@@ -33,7 +33,7 @@ impl ValidationStage for StructureValidationStage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::SectionDef;
+    use crate::domain::types::SectionDef;
 
     #[test]
     fn test_structure_validation_stage() {

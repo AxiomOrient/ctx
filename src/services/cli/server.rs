@@ -1,7 +1,6 @@
 //! Server command implementation
 
-
-use crate::drivers::http::router::{AppState, create_router};
+use crate::drivers::http::router::create_router;
 use std::net::SocketAddr;
 use tracing::info;
 
@@ -21,34 +20,24 @@ pub fn run_server(args: ServerArgs) -> crate::domain::errors::Result<()> {
 async fn run_server_async(args: ServerArgs) -> crate::domain::errors::Result<()> {
     // 트레이싱 초기화
     tracing_subscriber::fmt()
-        .with_env_filter("ctxset=debug,tower_http=debug")
+        .with_env_filter("ctx=debug,tower_http=debug")
         .init();
 
-    info!("Starting CTXSET server...");
+    info!("Starting ctx server...");
 
-    // 앱 상태 로드
-    let state = AppState::load()
-        .await
-        .map_err(|e| crate::domain::errors::ContextError::Other(format!("Failed to load app state: {}", e)))?;
-
-    // 라우터 생성
-    let app = create_router(state);
+    // 라우터 생성 (minimal health)
+    let app = create_router();
 
     // 서버 주소 설정
     let addr: SocketAddr = format!("{}:{}", args.host, args.port)
         .parse()
-        .map_err(|e| crate::domain::errors::ContextError::Other(format!("Invalid address: {}", e)))?;
+        .map_err(|e| {
+            crate::domain::errors::ContextError::Other(format!("Invalid address: {}", e))
+        })?;
 
     info!("Server listening on http://{}", addr);
     info!("API endpoints:");
-    info!("  GET  /healthz");
-    info!("  POST /api/classify");
-    info!("  POST /api/validate");
-    info!("  POST /api/compose");
-    info!("  GET  /api/rules");
-    info!("  PUT  /api/rules");
-    info!("  GET  /api/ontology");
-    info!("  PUT  /api/ontology");
+    info!("  GET  /health");
 
     // 서버 시작
     let listener = tokio::net::TcpListener::bind(addr)

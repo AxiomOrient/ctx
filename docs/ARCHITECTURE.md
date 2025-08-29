@@ -1,303 +1,100 @@
-1. CODEBASE_INDEX.md (프로젝트 대시보드)
+# ctx 아키텍처 (v3.1)
 
----
-title: Codebase Index
-last_updated: 2025-08-19
-project: ctxset (Deterministic Prompt Router & Composer)
-version: v1.0.0
----
+**마지막 업데이트: 2025-08-29**
 
-# Codebase Index
+## 1. 개요 (Overview)
 
-## 1. Purpose
-- 이 문서는 **프롬프트 결정성/유사-결정성**을 제공하는 컨텍스트/프롬프트 서비스의 진입점입니다.
-- 사람과 AI가 **같은 입력 → 같은 출력**, **비슷한 입력 → 유사한 출력**을 얻도록 구조/규칙/흐름을 제공합니다. (중앙 상수/임계 관리)  [oai_citation:6‡ARCHITECTURE.md](file-service://file-5V8VTGRypaEMaXLFYE7aqE)
+`ctx`는 AI 프롬프트 엔지니어링의 **결정론성(Determinism)**과 **재현성(Reproducibility)**을 보장하기 위해 설계된 컨텍스트 관리 및 생성 시스템입니다. 이 문서는 `ctx`의 아키텍처 원칙, 각 모듈의 상세 분석, 그리고 시스템의 전체적인 데이터 흐름을 기술합니다.
 
-## 2. Principles
-- UI → Domain 단방향, I/O 분리, 공용 상수/오류 중앙화.  [oai_citation:7‡ARCHITECTURE.md](file-service://file-5V8VTGRypaEMaXLFYE7aqE)
-- Feature ↔ Feature 직접 참조 금지(경계 유지).  [oai_citation:8‡ARCHITECTURE.md](file-service://file-5V8VTGRypaEMaXLFYE7aqE)
-- 외부 I/O는 Data 레이어만(서버/CLI는 코어 호출 전용).  [oai_citation:9‡ARCHITECTURE.md](file-service://file-5V8VTGRypaEMaXLFYE7aqE)
+### 1.1. 목표
 
-## 3. System Overview (C4 요약)
-- Context: 사용/외부 시스템(Webhook, LLM MCP)  [oai_citation:10‡INTEGRATION_GUIDE.md](file-service://file-3xZjv8YvazqtoUrbVoAgNY)  [oai_citation:11‡INTEGRATION_GUIDE.md](file-service://file-3xZjv8YvazqtoUrbVoAgNY)
-- Containers: App(Server/CLI), Core(분류/합성), Data(SQLite Index), Knowledge(온톨로지/룰)  [oai_citation:12‡ARCHITECTURE.md](file-service://file-5V8VTGRypaEMaXLFYE7aqE)
-- 주요 Components: classifier/normalizer/validator, composer(scorer/selector/merger/query)  [oai_citation:13‡ARCHITECTURE.md](file-service://file-5V8VTGRypaEMaXLFYE7aqE)
+- **동일 입력, 동일 출력**: 동일한 문서, 규칙, 코드 버전에 대해 항상 동일한 프롬프트 결과를 생성합니다.
+- **유지보수 및 확장성**: 명확한 계층과 규칙을 통해 코드의 복잡성을 관리하고 기능 확장을 용이하게 합니다.
+- **다중 인터페이스 지원**: 단일 바이너리 내에서 CLI, HTTP 서버, Tauri 데스크톱 UI, MCP 등 다양한 인터페이스를 지원합니다.
 
-## 4. Module Map (자동 생성)
-```yaml
-modules:
-  - name: app
-    responsibility: HTTP/MCP/CLI 진입점(핸들러/DTO)
-    depends_on: [core, doc, data]
-  - name: core/classifier
-    responsibility: 결정적 분류(룰+온톨로지), 정규화/정합성 검사
-    depends_on: [common, knowledge, doc]
-  - name: core/composer
-    responsibility: 레시피 기반 프롬프트 합성(스코어러/선택/병합)
-    depends_on: [common, knowledge, doc]
-  - name: data/index
-    responsibility: SQLite 인덱스(섹션/문서 스냅샷)
-    depends_on: [common]
-  - name: knowledge
-    responsibility: ontology/rules 관리
-    depends_on: [common]
-  - name: doc
-    responsibility: 파싱/스키마/검증
-    depends_on: [common, knowledge]
+### 1.2. 핵심 설계 원칙
 
+- **계층형 아키텍처 (Layered Architecture)**: 외부 세계와의 상호작용(`drivers`), 애플리케이션의 진입점 및 UI(`app`), 핵심 비즈니스 로직(`services`, `pipeline`), 그리고 순수 데이터 모델(`domain`)을 명확히 분리합니다.
+- **단방향 의존성 (Unidirectional Dependency)**: 의존성은 항상 외부 계층에서 내부 계층으로 흐릅니다 (`app` → `services` → `pipeline` → `domain`). 이 규칙은 컴파일 타임에 강제됩니다.
+- **관심사 분리 (Separation of Concerns)**: 외부 기술(DB, Web, AI API)은 `drivers`에, 핵심 로직은 `pipeline`과 `domain`에 캡슐화하여 기술 변화에 유연하게 대응합니다.
 
-⸻
+## 2. 시스템 아키텍처
 
-2) 폴더 구조 (Lean)
+`ctx`은 계층형 아키텍처를 따르며, 각 모듈은 명확한 책임을 가집니다.
 
-src/
-├─ common/               # 공통 타입/상수/에러/유틸리티 (모든 레이어에서 사용 가능)
-│  ├─ constants/{scoring.rs, parsing.rs, validation.rs, defaults.rs, graph.rs}
-│  ├─ errors.rs
-│  └─ utils.rs
-├─ knowledge/            # 온톨로지/룰 (I/O + 계산 분리)
-│  ├─ ontology/{mod.rs, schema.rs}
-│  └─ rules/{loader.rs, applier.rs, schema.rs}
-├─ doc/                  # 문서 처리(파싱/스키마/검증)
-│  ├─ parse/{frontmatter.rs, document.rs, section.rs}
-│  ├─ schema/{v1.rs, document.rs}
-│  └─ validate/{pipeline.rs, stages/{metadata.rs, schema.rs, structure.rs}}
-├─ core/                 # 비즈니스 핵심(분류/조합)
-│  ├─ classifier/{facet.rs, normalizer.rs}
-│  ├─ composer/{types.rs, scorer/{keyword.rs, freshness.rs, similarity.rs, facet_coverage.rs}, selector.rs, merger.rs, query.rs}
-│  ├─ dependency/{standard.rs}
-│  └─ transformer/
-├─ data/                 # 데이터 접근 (SQLite 인덱스, 스토리지)
-│  ├─ index/{sqlite.rs}
-│  ├─ storage/{local.rs}
-│  ├─ git/
-│  └─ id/
-├─ app/                  # 외부 인터페이스 (서버/CLI)
-│  ├─ server/{http.rs, dto.rs}               # feat: server (+ webhook endpoints)
-│  └─ cli/{app.rs, utils.rs, commands/{classify.rs, import.rs, parse.rs, github.rs, server.rs, mcp.rs}}   # feat: cli (+ MCP server)
-└─ lib.rs
-
-	•	최상위 폴더는 6개: common / knowledge / doc / core / data / app
-	•	내부는 필요한 만큼 세분화하되, 경계(폴더)는 그대로 유지한다.
-	•	상세 파일 구조는 [FILE_STRUCTURE.md](./FILE_STRUCTURE.md) 참조
-
-⸻
-
-
-5. Critical Flows
-	•	Prompt Compose: /v1/classify → /v1/validate → /v1/compose 표준 플로우.  ￼
-	•	Webhook 수신: POST /v1/hooks/:provider로 태스크 수신→분류/게이팅.  ￼
-	•	MCP: classifyText/composePrompt로 에이전트 통합.  ￼
-
-6. External Interfaces
-	•	REST: /v1/classify, /v1/validate, /v1/compose, /v1/index, /v1/search  ￼
-	•	MCP(JSON-RPC): ping, classifyText, composePrompt (샘플 요청/응답 포함)  ￼  ￼
-
-7. Ownership
-	•	CODEOWNERS: ./CODEOWNERS (코어/지식/데이터/앱 영역별 코드오너)
-
-8. Decisions
-	•	ADRs: ./adr/ (결정/대안/영향 기록)
-
-9. Determinism & Similarity-stable Policy(핵심)
-	•	동일 입력 → 동일 출력: 정규화 + 룰/레시피/가중치/commit_sha/상수 버전 해시로 Execution ID 고정.
-	•	유사 입력 → 유사 출력: SIMILARITY_THRESHOLD 이상이면 동일 레시피/유사 스니펫 조합(상수 중앙화).  ￼
-	•	Intent Gate: 태스크 카테고리↔행위(action) 불일치 거부/가이드.  ￼
-```
-
----
-
-# 2. `c4-diagrams/` (텍스트 기반 다이어그램)
-
-### `c4-diagrams/context.md`
-```markdown
-# Context Diagram — Deterministic Prompt Service
-
-- Users: PM/엔지니어/리뷰어
-- External Systems: Issue Trackers(Linear/GitHub/Jira), LLM Agents(MCP), VCS(Git)
+### 2.1. 아키텍처 다이어그램
 
 ```mermaid
-flowchart LR
-User -->|Task| Webhook
-Webhook -->|/v1/hooks/:provider| App
-Agent -->|MCP classifyText/composePrompt| App
-App --> Core
-Core --> Data[(SQLite Index)]
-Core --> Knowledge[(Ontology/Rules)]
-Core --> Doc[(Parsing/Schema)]
-App -->|/v1/search| Data
-App -->|/v1/index| Data
+graph TD
+    subgraph "User Interfaces & Entry Points"
+        direction LR
+        CLI[CLI<br>(app/mod.rs)]
+        TauriUI[Tauri UI<br>(apps/ui)]
+        HTTPServer[HTTP Server<br>(drivers/http)]
+        MCPServer[MCP Server<br>(drivers/mcp)]
+    end
+
+    subgraph "Application Layer"
+        App[Application Host<br>(app/mod.rs, app/ui)]
+        Services[Services Facade<br>(services/mod.rs)]
+    end
+
+    subgraph "Core Business Logic"
+        Pipeline[7-Stage Pipeline<br>(pipeline/mod.rs)]
+    end
+
+    subgraph "Domain Model"
+        Domain[Domain Objects & Rules<br>(domain/mod.rs)]
+    end
+
+    subgraph "Infrastructure & Drivers"
+        direction LR
+        Storage[Storage Driver<br>(drivers/storage)]
+        AI_Driver[AI Driver<br>(drivers/ai)]
+        Knowledge[Knowledge Loader<br>(knowledge)]
+    end
+
+    %% Flow
+    CLI --> App
+    TauriUI --> App
+    HTTPServer --> Services
+    MCPServer --> Services
+    App --> Services
+
+    Services --> Pipeline
+    Services --> AI_Driver
+
+    Pipeline --> Domain
+    Pipeline --> Knowledge
+    Pipeline --> Storage
 ```
 
-### `c4-diagrams/container.md`
-```markdown
-# Container Diagram — Lean 6 Layers
+### 2.2. 모듈별 상세 분석
 
-- App(Server/CLI)은 코어만 호출, 파일/DB는 Data 레이어로 위임.  [oai_citation:23‡ARCHITECTURE.md](file-service://file-5V8VTGRypaEMaXLFYE7aqE)
+| 모듈 경로 | 책임 | 핵심 분석 및 설계 패턴 | 상태 |
+| --- | --- | --- | --- |
+| `src/main.rs` | **최종 진입점** | `tokio::main`을 사용하여 비동기 `app::run_app`을 실행하고, 사용자 친화적인 에러 메시지를 처리하는 단일 책임만 가집니다. | **안정적** |
+| `src/app` | **애플리케이션 진입 및 UI 백엔드** | **Mode Switcher**: `clap`을 이용해 CLI 인자를 파싱하여 CLI, 서버, UI 등 다양한 모드로 분기합니다. **Facade Pattern**: `services` 계층의 함수를 호출하여 UI 및 CLI의 요청을 처리합니다. **보안**: Tauri UI의 Markdown 렌더링을 백엔드에서 수행하고 `ammonia`로 살균하여 XSS를 방지합니다. | **안정적** |
+| `apps/ui` | **프론트엔드 UI** | **Component-Based**: Svelte 5를 사용한 모던 SPA. **SSOT (Single Source of Truth)**: `svelte/store`를 사용해 중앙에서 상태를 관리하여 예측 가능성을 높입니다. **보안**: 백엔드에서 살균된 HTML만 렌더링하고, 파일 시스템 접근은 Tauri IPC를 통해서만 수행하여 프론트엔드 보안을 강화합니다. | **안정적** |
+| `src/services` | **유스케이스 파사드** | **Facade Pattern**: `Pipeline`과 `drivers`의 복잡한 로직을 `compose_prompt`, `work` 등 단순하고 의미있는 유스케이스로 캡슐화하여 제공합니다. **설정 관리**: `config.toml`과 지식 베이스(`ontology.yaml`, `rules.yaml`)를 유연하게 로드하여 파이프라인을 설정합니다. | **안정적** |
+| `src/drivers` | **외부 시스템 연동** | **Ports and Adapters**: `Storage` 트레이트(Port)와 `LocalFsStorage`(Adapter) 구현을 통해 스토리지 기술을 추상화합니다. **보안**: `LocalFsStorage`는 경로 순회 공격을 방지하는 로직을 포함합니다. **성능**: `storage/cache` 모듈은 LRU/TTL 기반의 정교한 인메모리 캐싱 시스템을 제공합니다. | **안정적** |
+| `src/pipeline` | **핵심 처리 파이프라인** | **Pipeline Pattern**: 7단계(정규화, 분류, 점수화, 선택, 트리밍, 템플릿화, 전송)의 명확한 데이터 처리 흐름을 정의합니다. **Strategy Pattern**: `scorer`는 키워드, 신선도, 유사도 등 다양한 점수 계산 전략을 조합하여 사용합니다. **결정론**: MMR 알고리즘과 배낭 알고리즘을 조합하여 토큰 예산 내에서 최적의 문서 조합을 결정론적으로 선택합니다. | **안정적** |
+| `src/domain` | **핵심 데이터 및 규칙** | **Rich Domain Model**: `ContextDocument`, `Rule` 등 핵심 비즈니스 개념을 타입으로 명확히 정의합니다. **Newtype Pattern**: `ContextHash`와 같은 타입을 사용하여 타입 안정성을 높이고 버그를 방지합니다. **결정론의 원천**: `constants` 모듈은 시스템의 모든 동작(가중치, 임계값 등)을 상수로 중앙 관리하여 결과의 재현성을 보장하는 핵심 역할을 합니다. | **안정적** |
+| `src/knowledge` | **외부 지식 베이스** | **지식과 코드의 분리**: `ontology.yaml`과 `rules.yaml` 파일을 로드하여, 코드 변경 없이 시스템의 분류 및 추론 로직을 수정할 수 있는 유연성을 제공합니다. `ClassifierEngine`은 이 지식을 기반으로 작동합니다. | **안정적** |
+| `src/doc` | **문서 파싱 및 검증** | **Parser & Validator**: 마크다운과 Frontmatter를 `ContextDocument`로 변환하고, 여러 단계의 검증(`Metadata`, `Schema`, `Structure`)을 통해 데이터의 정합성을 보장하는 파이프라인을 갖추고 있습니다. | **안정적** |
+| `src/util` | **공용 유틸리티** | 결정론적 해시 생성, 파일 시스템 유틸리티, Git 연동 등 프로젝트 전반에서 사용되는 저수준 유틸리티를 제공합니다. | **안정적** |
 
-```mermaid
-flowchart LR
-App[App: Server/CLI] --> Core
-Core[Core: Classifier/Composer] --> Data[(Data: SQLite/Git)]
-Core --> Knowledge[(Knowledge: Ontology/Rules)]
-Core --> Doc[(Doc: Parsing/Validate)]
-```
+## 3. 핵심 처리 흐름: `compose_prompt` (UI 기준)
 
-### `c4-diagrams/component.md`
-```markdown
-# Component Diagram — Classify→Validate→Compose
+UI에서 프롬프트를 생성하는 흐름은 아키텍처의 모든 계층을 명확하게 보여줍니다.
 
-```mermaid
-sequenceDiagram
-participant App
-participant Classifier
-participant Validator
-participant Composer
-participant Data
-participant Knowledge
+1.  **`apps/ui` (프론트엔드)**: 사용자가 프롬프트 입력 후 'Generate' 버튼을 클릭합니다. `RightDockPrompt.svelte` 컴포넌트가 `lib/ipc.ts`의 `compose` 함수를 호출합니다.
+2.  **`ipc.ts` (IPC 래퍼)**: `invoke('compose', ...)`를 통해 Tauri의 IPC 채널로 백엔드의 `compose` 함수 호출을 요청합니다.
+3.  **`app/ui/tauri_app.rs` (Tauri 핸들러)**: `#[tauri::command]`로 노출된 `compose` 함수가 요청을 받아, `app/ui/ipc.rs`의 `compose` 함수를 호출합니다.
+4.  **`app/ui/ipc.rs` (UI 백엔드 로직)**: IPC 요청을 받아 `services::compose_prompt`를 호출하여 핵심 로직을 실행합니다.
+5.  **`services` (파사드)**: `compose_prompt` 함수는 `Pipeline` 객체를 생성하고, 설정과 지식 베이스를 로드한 뒤 `pipeline.execute()`를 호출합니다.
+6.  **`pipeline` (핵심 로직)**:
+    - **Stage 1-6**: 쿼리 분류, 문서 검색, 점수 계산, MMR 선택, 병합 등 전체 컨텍스트 생성 과정을 수행합니다.
+7.  **결과 반환**: 생성된 `PromptBundle`이 `services` → `app` → Tauri IPC를 거쳐 프론트엔드로 반환되고, UI가 업데이트됩니다.
 
-App->>Classifier: /v1/classify(text, metadata)
-Classifier->>Knowledge: rules/ontology
-Classifier-->>App: facets, confidence
-App->>Validator: /v1/validate(facets, task_contract)
-Validator-->>App: valid | reject(reason)
-App->>Composer: /v1/compose(facets, commit_sha, budget)
-Composer->>Data: query sections (SQLite)
-Composer-->>App: minimal prompt + trace
-```
-
----
-
-# 3. `adr/` (Architecture Decision Records)
-
-### `adr/0001-similarity-stable-determinism.md`
-```markdown
-# ADR 0001 — Similarity-stable Determinism for Prompt Composition
-- Status: Accepted (2025-08-19)
-
-## Context
-동일한 태스크 입력은 희귀. 실무에서는 "비슷한" 태스크가 반복된다. 따라서 "동일 입력=동일 출력"과 함께 "유사 입력=유사 출력"을 **명시적 정책**으로 채택하고, 상수/임계값/가중치/레시피 버전으로 제어한다. (상수 중앙화)  [oai_citation:24‡ARCHITECTURE.md](file-service://file-5V8VTGRypaEMaXLFYE7aqE)
-
-## Decision
-1) **Execution ID** = hash(canonical_input, rules_version, recipe_version, commit_sha, constants_version).  
-2) **Similarity-stable 합성** = facet 일치도 + 텍스트 유사도 + 구조 유사도 가중합 ≥ `SIMILARITY_THRESHOLD`면 동일 레시피/유사 스니펫 세트 사용.  [oai_citation:25‡ARCHITECTURE.md](file-service://file-5V8VTGRypaEMaXLFYE7aqE)  
-3) **Intent Gate**로 카테고리↔action 불일치 즉시 거부. API `/v1/classify|validate|compose` 흐름 표준화.  [oai_citation:26‡ARCHITECTURE.md](file-service://file-5V8VTGRypaEMaXLFYE7aqE)
-
-## Alternatives
-- 전면 LLM 판단: 결정성·재현성 저하.
-- 룰만 사용: 저신뢰 케이스 처리 곤란 → LLM Assist는 **임계치 미만**에서만 보조.  [oai_citation:27‡PLAN.md](file-service://file-NbprB8xM2fRaQRwwdXRnCK)
-
-## Consequences
-- 재현성/Audit 용이, **유사-결정성**으로 운영 예측 가능.
-- 정책/상수 변경은 버전 승격으로 추적.
-
-adr/0002-api-surface-and-integration.md
-
-# ADR 0002 — Public API Surface & Integrations
-- Status: Accepted (2025-08-19)
-
-## Decision
-- REST: `/v1/classify`, `/v1/validate`, `/v1/compose`, `/v1/index`, `/v1/search` 유지. 핸들러는 코어 호출 전용.  [oai_citation:28‡ARCHITECTURE.md](file-service://file-5V8VTGRypaEMaXLFYE7aqE)  
-- Webhook: `POST /v1/hooks/:provider` 수신 스펙 고정.  [oai_citation:29‡INTEGRATION_GUIDE.md](file-service://file-3xZjv8YvazqtoUrbVoAgNY)  
-- MCP: `classifyText`, `composePrompt`를 표준 JSON-RPC로 노출. 샘플 페이로드/응답 명세 채택.  [oai_citation:30‡INTEGRATION_GUIDE.md](file-service://file-3xZjv8YvazqtoUrbVoAgNY)  [oai_citation:31‡INTEGRATION_GUIDE.md](file-service://file-3xZjv8YvazqtoUrbVoAgNY)
-
-## Consequences
-- 다양한 에이전트/이슈트래커 통합 용이.
-- 네트워크/인증/로그 가이드 준수 필요.  [oai_citation:32‡INTEGRATION_GUIDE.md](file-service://file-3xZjv8YvazqtoUrbVoAgNY)
-
-
-⸻
-
-4. ARCHITECTURE.md (불변 규칙 + CI/CD 검증 일치)
-
-# Architecture Rules — ctxset v1.0.0
-
-## Module Boundaries (Lean 6)
-- allow: app → core/doc/data (코어 호출 전용, 파일/DB는 data로 위임)  [oai_citation:33‡ARCHITECTURE.md](file-service://file-5V8VTGRypaEMaXLFYE7aqE)
-- allow: core → common/knowledge/doc (의존 규칙 준수)  [oai_citation:34‡ARCHITECTURE.md](file-service://file-5V8VTGRypaEMaXLFYE7aqE)
-- allow: data → common (core/doc/knowledge 직접 참조 금지)  [oai_citation:35‡ARCHITECTURE.md](file-service://file-5V8VTGRypaEMaXLFYE7aqE)
-- deny: feature↔feature 직접 참조, core→app 역참조, app→knowledge 직접.  [oai_citation:36‡ARCHITECTURE.md](file-service://file-5V8VTGRypaEMaXLFYE7aqE)
-
-## API Surface (검증 대상)
-- POST `/v1/classify` → `{facets, score, evidence}`
-- POST `/v1/validate` → `{valid, issues, suggestions}`
-- POST `/v1/compose` → `{sections, merged, trace}`
-- POST `/v1/index`, GET `/v1/search` (서버 핸들러는 코어만 호출)  [oai_citation:37‡ARCHITECTURE.md](file-service://file-5V8VTGRypaEMaXLFYE7aqE)
-
-## Determinism & Similarity-stable (강제 규칙)
-1) **Canonicalization**  
-   - 입력 정규화: 공백/마크다운/코드펜스/경로/URL/날짜 표준화 → `canonical_input` 생성(해시 입력).  
-   - 문맥 버전: `repo, branch, commit_sha` 필수. 같은 commit_sha에서만 동일성 비교 허용. (인덱스 API 요구)  [oai_citation:38‡FILE_STRUCTURE.md](file-service://file-VScQ1XcTAGm7E6VrjUwKFH)
-2) **Execution ID**  
-   - `exec_id = hash(canonical_input, rules_version, recipe_version, commit_sha, constants_version)` (idempotent 재실행).
-3) **Similarity-stable Policy**  
-   - `similarity = w_facet·FacetSim + w_text·TextSim + w_struct·StructSim`  
-   - `similarity ≥ SIMILARITY_THRESHOLD` → 동일 레시피 및 유사 스니펫 집합 채택. (상수 중앙화)  [oai_citation:39‡ARCHITECTURE.md](file-service://file-5V8VTGRypaEMaXLFYE7aqE)
-4) **Intent Gate (Policy)**  
-   - 태스크 계약에서 **허용 action**만 통과(예: `legacy_edit` → {refactor, migrate}만). 불일치 시 거부 + 허용 목록 안내.  [oai_citation:40‡ARCHITECTURE.md](file-service://file-5V8VTGRypaEMaXLFYE7aqE)
-
-## Composer Rules
-- 스코어러 가중치/타이브레이커는 공용 상수로 고정 (`scoring.rs`, `validation.rs`).  [oai_citation:41‡ARCHITECTURE.md](file-service://file-5V8VTGRypaEMaXLFYE7aqE)
-- 선택 가능한 **스니펫 상한**, **MMR lambda**, **freshness weight**는 constants에서만 변경. CI로 diff 감지.  [oai_citation:42‡ARCHITECTURE.md](file-service://file-5V8VTGRypaEMaXLFYE7aqE)
-
-## Classifier Rules
-- 규칙 기반(정규식/키워드/링크/코드펜스) + 정합성 검사(implies/conflicts). 임계 미만만 LLM Assist.  [oai_citation:43‡PLAN.md](file-service://file-NbprB8xM2fRaQRwwdXRnCK)  [oai_citation:44‡PLAN.md](file-service://file-NbprB8xM2fRaQRwwdXRnCK)
-
-## Documents & Numbering
-- Story 단위 **단일 tasks.md** 유지(관계/추적성/프롬프트 최적화), 표준 번호 체계(REQ/DES/Task/AC).  [oai_citation:45‡SYSTEM_OVERVIEW.md](file-service://file-QcuFd9HRXWti24CFcMectU)  [oai_citation:46‡SYSTEM_OVERVIEW.md](file-service://file-QcuFd9HRXWti24CFcMectU)
-
-## CI/CD Architecture Guards
-- trybuild로 역참조 금지 테스트, clippy 경고 금지, 금지 룰 엄격 적용.  [oai_citation:47‡ARCHITECTURE.md](file-service://file-5V8VTGRypaEMaXLFYE7aqE)
-
-
-⸻
-
-부록) 구현에 바로 쓰는 핵심 스펙(요지)
-	•	입력 DTO
-	•	/v1/classify: { text, metadata? } → { facets, score, evidence }  ￼
-	•	/v1/validate: { facets, task_contract } → { valid, issues[], suggestions[] } (정책 일치)  ￼
-	•	/v1/compose: { facets, repo, branch, commit_sha, budget } → { sections[], merged, trace }  ￼
-	•	유사-결정성 계산
-	•	FacetSim: Jaccard over categorical facets
-	•	TextSim: 토큰 코사인(정규화 토크나이저)
-	•	StructSim: REQ/DES/Task/AC 참조 비율 비교
-	•	파라미터: SIMILARITY_THRESHOLD, DEFAULT_MMR_LAMBDA, DEFAULT_FRESHNESS_WEIGHT 등은 중앙 상수.  ￼  ￼
-	•	거부 규칙
-	•	카테고리↔action 불일치(예: legacy_edit × design)는 즉시 거부 + 허용 액션 안내.  ￼
-	•	연동
-	•	Webhook POST /v1/hooks/:provider (토큰 헤더 필수), MCP classifyText/composePrompt 샘플 스펙 제공.  ￼  ￼
-	•	보안/운영
-	•	토큰/HMAC(계획), HTTPS, 방화벽, 레이트리밋, 민감정보 로그 금지, 헬스체크/트러블슈팅 가이드.  ￼  ￼
-
-⸻
-
-
-CTXSET 아키텍처 (Lean 모드)
-
-버전: 1.0
-작성일: 2025-08-12
-목적: 최소 폴더 수(6~8개)로 경계를 유지하면서, CLI/서버/Web UI까지 확장 가능한 컨텍스트 엔지니어링 플랫폼의 코어 구조를 정의한다.
-
-⸻
-
-1) 설계 원칙
-	1.	단방향 의존성
-types → knowledge → doc → core → app 순으로만 참조. 반대 참조 금지.
-	2.	I/O와 순수 계산 분리
-로더/저장은 knowledge/loader, data/에서만. 분류/스코어링은 core/.
-	3.	공용 상수/에러 중앙화
-매직 넘버·문자열 금지 → types/constants/*에서만 정의·노출.
-	4.	공유 코어, 진입점 분리
-비즈니스 로직은 core/에만. app/server, app/cli는 코어 호출 전용.
-	5.	Feature 플래그로 가시성 축소
-server, cli, dep-graph 등은 필요 시에만 컴파일.
-
-3) 의존 규칙
-	•	common → 누구나 사용 가능 (타입/상수/에러/유틸리티)
-	•	knowledge → common만 참조
-	•	doc → common, knowledge 참조 가능(온톨로지 기반 파싱 정규화)
-	•	core → common, knowledge, doc 참조
-	•	data → common만 참조 (core를 보지 않음)
-	•	app → common, knowledge, doc, core, data 참조 (app은 코어 호출 전용)
-
-금지: app → knowledge 직접 참조, core → app 역참조, data → core/doc/knowledge 참조.
+이러한 흐름은 모든 의존성이 외부(UI)에서 내부(도메인)로 향하며, 각 계층이 명확한 책임을 갖는 전형적인 클린 아키텍처(Clean Architecture) 구조를 보여줍니다.

@@ -1,3 +1,2 @@
-pub mod server;
-
-pub use server::run_mcp_server;
+pub mod sdk;
+pub use sdk::run_mcp_server;

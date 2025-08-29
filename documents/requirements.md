@@ -2,7 +2,7 @@
 
 ## Introduction
 
-CTXSET (Deterministic Prompt Router & Composer)는 프롬프트 결정성과 유사-결정성을 제공하는 컨텍스트/프롬프트 서비스입니다. 현재 코드베이스는 아키텍처가 잘 설계되어 있지만 핵심 구현이 미완성 상태입니다. 이 요구사항 문서는 완전한 구현을 위한 기능적/비기능적 요구사항을 정의합니다.
+ctx (Deterministic Prompt Router & Composer)는 프롬프트 결정성과 유사-결정성을 제공하는 컨텍스트/프롬프트 서비스입니다. 현재 코드베이스는 아키텍처가 잘 설계되어 있지만 핵심 구현이 미완성 상태입니다. 이 요구사항 문서는 완전한 구현을 위한 기능적/비기능적 요구사항을 정의합니다.
 
 ## Requirements
 
@@ -59,7 +59,7 @@ CTXSET (Deterministic Prompt Router & Composer)는 프롬프트 결정성과 유
 
 ### Requirement 5: Complete MCP Server Implementation
 
-**User Story:** As an LLM agent, I want to access classification and composition functions via MCP protocol, so that I can integrate with the ctxset service.
+**User Story:** As an LLM agent, I want to access classification and composition functions via MCP protocol, so that I can integrate with the ctx service.
 
 #### Acceptance Criteria
 
@@ -128,7 +128,7 @@ CTXSET (Deterministic Prompt Router & Composer)는 프롬프트 결정성과 유
 3. WHEN loading candidates THEN the system SHALL use database connection pooling with prepared statements
 4. WHEN calculating similarities THEN the system SHALL use efficient algorithms and avoid redundant computations
 5. WHEN serving multiple requests THEN the system SHALL handle concurrent access safely with proper locking
-## 
+##
 Requirements Dependencies
 
 ### Core Dependencies

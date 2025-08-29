@@ -1,9 +1,9 @@
 use sha2::{Digest, Sha256};
-use uuid::{Uuid, uuid};
+use uuid::{uuid, Uuid};
 
-/// ctxset 전용 네임스페이스 UUID
+/// ctx 전용 네임스페이스 UUID
 #[allow(dead_code)]
-static NAMESPACE_CTXSET: Uuid = uuid!("2d2e4f1c-34d6-4f2b-9f6e-0a7e7ce6f3a2");
+static NAMESPACE_CTX: Uuid = uuid!("2d2e4f1c-34d6-4f2b-9f6e-0a7e7ce6f3a2");
 
 /// ID 생성 유틸리티
 #[allow(dead_code)]
@@ -20,7 +20,7 @@ impl IdGenerator {
 
     /// 안정적인 문서 ID 생성
     ///
-    /// 규칙: doc_id = UUIDv5(NAMESPACE_CTXSET, "${repo}@${first_add_commit_sha}:${initial_title_or_hash}")
+    /// 규칙: doc_id = UUIDv5(NAMESPACE_CTX, "${repo}@${first_add_commit_sha}:${initial_title_or_hash}")
     ///
     /// # Arguments
     /// * `repo` - 저장소 경로 또는 이름
@@ -29,7 +29,7 @@ impl IdGenerator {
     #[allow(dead_code)]
     pub fn stable_doc_id(repo: &str, first_add_sha: &str, initial_title_or_hash: &str) -> String {
         let name = format!("{}@{}:{}", repo, first_add_sha, initial_title_or_hash);
-        let uuid = Uuid::new_v5(&NAMESPACE_CTXSET, name.as_bytes());
+        let uuid = Uuid::new_v5(&NAMESPACE_CTX, name.as_bytes());
         format!("doc/{}", uuid)
     }
 

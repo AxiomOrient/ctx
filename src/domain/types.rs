@@ -1,4 +1,6 @@
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "mcp_sdk")]
+use rmcp::schemars as schemars;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -346,6 +348,7 @@ impl WorkInput {
     }
 }
 
+#[cfg_attr(feature = "mcp_sdk", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkOutput {
     pub response: AiResponse,
@@ -363,6 +366,7 @@ impl WorkOutput {
     }
 }
 
+#[cfg_attr(feature = "mcp_sdk", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromptBundle {
     pub prompt: String,
@@ -419,6 +423,7 @@ impl AiPrompt {
     }
 }
 
+#[cfg_attr(feature = "mcp_sdk", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AiResponse {
     pub content: String,

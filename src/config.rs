@@ -5,7 +5,9 @@ use std::{fs, path::Path};
 pub struct Defaults { pub budget: usize, pub min_confidence: f32, pub mmr_lambda: f32, pub reply_max: usize }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct Paths { pub index_dir: String, pub cache_dir: String, pub ontology: String, pub rules: String }
+pub struct Paths { pub index_dir: String, pub cache_dir: String, pub ontology: String, pub rules: String, #[serde(default = "default_docs_dir")] pub docs_dir: String }
+
+fn default_docs_dir() -> String { "documents".to_string() }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct AiCli { pub cmd: String, pub args: Vec<String>, pub timeout_ms: u64 }

@@ -1,0 +1,7 @@
+{
+  "query": "Merge multiple documents to explain context composition, scoring, and MMR selection.",
+  "tags": ["compose", "mmr"],
+  "max_tokens": 800,
+  "exclude_sources": null,
+  "priority_sources": null
+}

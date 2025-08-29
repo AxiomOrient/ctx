@@ -19,40 +19,36 @@ impl LocalFsStorage {
 
     /// 절대 경로 생성 (경로 탐색 공격 방지)
     fn resolve_path(&self, path: &Path) -> Result<PathBuf> {
-        let resolved = if path.is_absolute() {
-            path.to_path_buf()
-        } else {
-            self.base_path.join(path)
-        };
+        // Build a full path under base_path
+        let joined = if path.is_absolute() { path.to_path_buf() } else { self.base_path.join(path) };
 
-        // 경로 정규화 - 존재하지 않는 파일도 처리 가능하도록 수정
-        let normalized = self.normalize_path(&resolved);
+        // Normalize components without requiring existence
+        let normalized = self.normalize_path(&joined);
 
-        // base_path 밖으로 벗어나는 것을 방지 (심볼릭 링크 고려)
+        // Canonicalize base and parent if possible for secure comparison
         let base_canonical = self
             .base_path
             .canonicalize()
             .unwrap_or_else(|_| self.normalize_path(&self.base_path));
 
-        // 정규화된 경로도 canonicalize 시도 (부모 디렉토리가 존재하는 경우)
-        let normalized_canonical = if let Some(parent) = normalized.parent() {
+        let candidate_canonical = if let Some(parent) = normalized.parent() {
             if parent.exists() {
-                // 부모 디렉토리가 존재하면 canonicalize 후 파일명 추가
                 parent
                     .canonicalize()
                     .map(|p| p.join(normalized.file_name().unwrap_or_default()))
                     .unwrap_or_else(|_| normalized.clone())
             } else {
-                normalized.clone()
+                // Parent doesn't exist; approximate by joining to canonical base
+                base_canonical.join(path)
             }
         } else {
-            normalized.clone()
+            base_canonical.join(path)
         };
 
-        if !normalized_canonical.starts_with(&base_canonical) {
+        if !candidate_canonical.starts_with(&base_canonical) {
             return Err(ContextError::Other(format!(
                 "Path traversal attempt detected: {:?} (resolved to {:?}, base: {:?})",
-                path, normalized_canonical, base_canonical
+                path, candidate_canonical, base_canonical
             )));
         }
 
@@ -140,6 +136,8 @@ impl Storage for LocalFsStorage {
             }
         }
 
+        // Deterministic ordering for determinism guarantees
+        files.sort_by(|a, b| a.as_os_str().cmp(b.as_os_str()));
         Ok(files)
     }
 
@@ -220,6 +218,6 @@ mod tests {
         let attempt = std::path::Path::new("../../etc/passwd");
         let err = storage.read(attempt).unwrap_err();
         let msg = format!("{}", err);
-        assert!(msg.contains("Path traversal attempt"));
+        assert!(msg.contains("Path traversal attempt detected"));
     }
 }

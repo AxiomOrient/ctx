@@ -1,0 +1,7 @@
+{
+  "query": "Explain how ctx enforces unidirectional dependencies and layered architecture.",
+  "tags": ["architecture"],
+  "max_tokens": 512,
+  "exclude_sources": null,
+  "priority_sources": null
+}

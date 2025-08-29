@@ -1,7 +1,7 @@
-use crate::pipeline::scorer::ScoredCandidate;
-use crate::domain::types::{BuildQuery, DocumentCandidate};
 use crate::domain::errors::Result;
 use crate::domain::types::MergedDocument;
+use crate::domain::types::{BuildQuery, DocumentCandidate};
+use crate::pipeline::scorer::ScoredCandidate;
 // use crate::domain::tokenizer::{SimpleTokenizer, Tokenizer};
 // chrono::Utc not used directly here; timestamps are formatted via chrono in formatting macros
 use regex::Regex;
@@ -36,8 +36,9 @@ pub struct DocumentMerger {
 impl DocumentMerger {
     pub fn new() -> Result<Self> {
         Ok(Self {
-            paragraph_regex: Regex::new(r"\n{2,}")
-                .map_err(|e| crate::domain::errors::ContextError::Other(format!("Invalid regex pattern: {}", e)))?,
+            paragraph_regex: Regex::new(r"\n{2,}").map_err(|e| {
+                crate::domain::errors::ContextError::Other(format!("Invalid regex pattern: {}", e))
+            })?,
             // tokenizer: Box::new(SimpleTokenizer),
         })
     }
@@ -132,7 +133,7 @@ impl DocumentMerger {
             content: merged_content,
             source_documents,
             tokens: total_tokens, //final_tokens,
-            sections: vec![], // sections,
+            sections: vec![],     // sections,
         })
     }
 
@@ -250,7 +251,7 @@ impl Default for DocumentMerger {
     fn default() -> Self {
         Self::new().unwrap_or_else(|_| Self {
             paragraph_regex: Regex::new(r"\\n{2,}").unwrap(), // fallback for default
-            // tokenizer: Box::new(SimpleTokenizer),
+                                                              // tokenizer: Box::new(SimpleTokenizer),
         })
     }
 }
@@ -264,7 +265,7 @@ mod tests {
     fn create_test_candidate(id: &str, title: &str, content: &str) -> DocumentCandidate {
         // 테스트용 임시 파일 생성 (시스템 임시 디렉토리 사용)
         let temp_dir = std::env::temp_dir();
-        let temp_path = temp_dir.join(format!("ctxset_test_{}.md", id));
+        let temp_path = temp_dir.join(format!("ctx_test_{}.md", id));
         std::fs::write(&temp_path, content).unwrap();
 
         DocumentCandidate {
@@ -329,8 +330,8 @@ mod tests {
 
     #[test]
     fn test_merge_documents_with_query() -> Result<()> {
-        use crate::pipeline::scorer::ScoredCandidate;
         use crate::domain::types::BuildQuery;
+        use crate::pipeline::scorer::ScoredCandidate;
 
         let merger = DocumentMerger::new()?;
 
@@ -392,8 +393,8 @@ mod tests {
 
     #[test]
     fn test_confidence_scoring_in_sections() -> Result<()> {
-        use crate::pipeline::scorer::ScoredCandidate;
         use crate::domain::types::BuildQuery;
+        use crate::pipeline::scorer::ScoredCandidate;
 
         let merger = DocumentMerger::new()?;
 
@@ -408,7 +409,7 @@ mod tests {
             "commit".to_string(),
         );
 
-        let result = merger.merge_documents_with_query(documents, &query)?;
+        let _result = merger.merge_documents_with_query(documents, &query)?;
 
         // 섹션에 신뢰도가 포함되어야 함
         // assert_eq!(result.sections.len(), 1);

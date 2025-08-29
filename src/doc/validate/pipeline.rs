@@ -104,7 +104,7 @@ pub struct ValidationFailure {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ContextDocument;
+    use crate::domain::types::ContextDocument;
 
     struct TestStage {
         name: &'static str,

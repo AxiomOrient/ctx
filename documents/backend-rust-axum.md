@@ -11,7 +11,7 @@ dependencies: [rust-language, core-principles]
 
 ## 🚀 스택 개요
 
-Axum은 Rust로 작성된 현대적이고 성능이 뛰어난 웹 프레임워크입니다. 
+Axum은 Rust로 작성된 현대적이고 성능이 뛰어난 웹 프레임워크입니다.
 Tokio 생태계를 기반으로 하며, 타입 안전성과 성능을 모두 제공합니다.
 
 ### 핵심 구성 요소
@@ -20,37 +20,6 @@ Tokio 생태계를 기반으로 하며, 타입 안전성과 성능을 모두 제
 - **SQLx**: 데이터베이스 ORM
 - **Serde**: 직렬화/역직렬화
 - **Tower**: 미들웨어 시스템
-
-## 🏗️ 프로젝트 구조
-
-```
-src/
-├── main.rs              # 애플리케이션 진입점
-├── lib.rs               # 라이브러리 루트
-├── config/              # 설정 관리
-│   ├── mod.rs
-│   └── database.rs
-├── handlers/            # HTTP 핸들러
-│   ├── mod.rs
-│   ├── auth.rs
-│   └── users.rs
-├── models/              # 데이터 모델
-│   ├── mod.rs
-│   └── user.rs
-├── repositories/        # 데이터 접근 계층
-│   ├── mod.rs
-│   └── user_repository.rs
-├── services/            # 비즈니스 로직
-│   ├── mod.rs
-│   └── user_service.rs
-├── middleware/          # 커스텀 미들웨어
-│   ├── mod.rs
-│   ├── auth.rs
-│   └── logging.rs
-└── utils/               # 유틸리티 함수
-    ├── mod.rs
-    └── validation.rs
-```
 
 ## 📦 의존성 설정
 
@@ -149,7 +118,7 @@ async fn main() -> anyhow::Result<()> {
     // 서버 시작
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
     tracing::info!("Server listening on {}", addr);
-    
+
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
 
@@ -218,9 +187,9 @@ pub async fn list_users(
 ) -> Result<Json<ListUsersResponse>, (StatusCode, String)> {
     let page = query.page.unwrap_or(1);
     let limit = query.limit.unwrap_or(10);
-    
+
     let user_service = UserService::new(&state.pool);
-    
+
     match user_service.list_users(page, limit).await {
         Ok((users, total)) => Ok(Json(ListUsersResponse {
             users,
@@ -240,7 +209,7 @@ pub async fn get_user(
     Path(id): Path<Uuid>,
 ) -> Result<Json<User>, (StatusCode, String)> {
     let user_service = UserService::new(&state.pool);
-    
+
     match user_service.get_user(id).await {
         Ok(Some(user)) => Ok(Json(user)),
         Ok(None) => Err((StatusCode::NOT_FOUND, "User not found".to_string())),
@@ -256,7 +225,7 @@ pub async fn create_user(
     ValidatedJson(request): ValidatedJson<CreateUserRequest>,
 ) -> Result<(StatusCode, Json<User>), (StatusCode, String)> {
     let user_service = UserService::new(&state.pool);
-    
+
     match user_service.create_user(request).await {
         Ok(user) => Ok((StatusCode::CREATED, Json(user))),
         Err(e) => {
@@ -272,7 +241,7 @@ pub async fn update_user(
     ValidatedJson(request): ValidatedJson<UpdateUserRequest>,
 ) -> Result<Json<User>, (StatusCode, String)> {
     let user_service = UserService::new(&state.pool);
-    
+
     match user_service.update_user(id, request).await {
         Ok(Some(user)) => Ok(Json(user)),
         Ok(None) => Err((StatusCode::NOT_FOUND, "User not found".to_string())),
@@ -307,10 +276,10 @@ pub struct User {
 pub struct CreateUserRequest {
     #[validate(email(message = "Invalid email format"))]
     pub email: String,
-    
+
     #[validate(length(min = 1, max = 100, message = "Name must be between 1 and 100 characters"))]
     pub name: String,
-    
+
     #[validate(length(min = 8, message = "Password must be at least 8 characters"))]
     pub password: String,
 }
@@ -319,7 +288,7 @@ pub struct CreateUserRequest {
 pub struct UpdateUserRequest {
     #[validate(email(message = "Invalid email format"))]
     pub email: Option<String>,
-    
+
     #[validate(length(min = 1, max = 100, message = "Name must be between 1 and 100 characters"))]
     pub name: Option<String>,
 }
@@ -458,7 +427,7 @@ async fn test_create_user() {
 async fn create_test_pool() -> sqlx::PgPool {
     let database_url = std::env::var("TEST_DATABASE_URL")
         .unwrap_or_else(|_| "postgres://localhost/test_db".to_string());
-    
+
     sqlx::PgPool::connect(&database_url)
         .await
         .expect("Failed to connect to test database")
@@ -520,5 +489,5 @@ volumes:
   postgres_data:
 ```
 
-이 스택 가이드는 Rust와 Axum을 사용한 백엔드 개발의 모범 사례를 제시합니다. 
+이 스택 가이드는 Rust와 Axum을 사용한 백엔드 개발의 모범 사례를 제시합니다.
 프로젝트의 특성에 따라 추가적인 미들웨어나 서비스를 구성할 수 있습니다.

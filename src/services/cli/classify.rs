@@ -18,7 +18,7 @@ pub fn run_classify(args: ClassifyArgs) -> Result<()> {
     
     // Read file content
     let content = std::fs::read_to_string(&args.file)
-        .map_err(|e| crate::domain::errors::ContextError::Io(e))?;
+        .map_err(crate::domain::errors::ContextError::Io)?;
     
     // Use our services::classify_text function
     let facets = crate::services::classify_text(&content)?;

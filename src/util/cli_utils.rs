@@ -59,7 +59,7 @@ mod tests {
     }
 
     #[test]
-    fn test_format_output_json() -> ctx_core::Result<()> {
+    fn test_format_output_json() -> crate::domain::errors::Result<()> {
         let data = TestData {
             name: "test".to_string(),
             value: 42,
@@ -72,7 +72,7 @@ mod tests {
     }
 
     #[test]
-    fn test_format_output_yaml() -> ctx_core::Result<()> {
+    fn test_format_output_yaml() -> crate::domain::errors::Result<()> {
         let data = TestData {
             name: "test".to_string(),
             value: 42,

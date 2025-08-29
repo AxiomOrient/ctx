@@ -1,27 +1,34 @@
-{% extends "base.html" %}
-
-{% block title %}문서 분류 - CtxSet{% endblock %}
-
-{% block content %}
+{% extends "base.html" %} {% block title %}문서 분류 - Ctx{% endblock %} {%
+block content %}
 <div class="px-4 py-6 sm:px-0">
     <div class="border-4 border-dashed border-gray-200 rounded-lg p-6">
         <h2 class="text-2xl font-bold text-gray-900 mb-6">문서 분류</h2>
-        
+
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <!-- Input Form -->
             <div class="bg-white shadow rounded-lg p-6">
-                <h3 class="text-lg font-medium text-gray-900 mb-4">문서 입력</h3>
-                
+                <h3 class="text-lg font-medium text-gray-900 mb-4">
+                    문서 입력
+                </h3>
+
                 <!-- 입력 방법 선택 탭 -->
                 <div class="mb-6">
                     <div class="border-b border-gray-200">
                         <nav class="-mb-px flex space-x-8">
-                            <button type="button" onclick="showTab('file')" id="file-tab"
-                                    class="tab-button active border-blue-500 text-blue-600 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+                            <button
+                                type="button"
+                                onclick="showTab('file')"
+                                id="file-tab"
+                                class="tab-button active border-blue-500 text-blue-600 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
+                            >
                                 📁 파일 업로드
                             </button>
-                            <button type="button" onclick="showTab('text')" id="text-tab"
-                                    class="tab-button border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+                            <button
+                                type="button"
+                                onclick="showTab('text')"
+                                id="text-tab"
+                                class="tab-button border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
+                            >
                                 ✏️ 텍스트 입력
                             </button>
                         </nav>
@@ -32,45 +39,101 @@
                 <div id="file-form">
                     <div class="space-y-4">
                         <div>
-                            <label for="file-input" class="block text-sm font-medium text-gray-700">파일 선택</label>
-                            <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-gray-400 transition-colors">
+                            <label
+                                for="file-input"
+                                class="block text-sm font-medium text-gray-700"
+                                >파일 선택</label
+                            >
+                            <div
+                                class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-gray-400 transition-colors"
+                            >
                                 <div class="space-y-1 text-center">
-                                    <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                    <svg
+                                        class="mx-auto h-12 w-12 text-gray-400"
+                                        stroke="currentColor"
+                                        fill="none"
+                                        viewBox="0 0 48 48"
+                                    >
+                                        <path
+                                            d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                                            stroke-width="2"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                        />
                                     </svg>
                                     <div class="flex text-sm text-gray-600">
-                                        <label for="file-input" class="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
+                                        <label
+                                            for="file-input"
+                                            class="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
+                                        >
                                             <span>파일을 선택하거나</span>
-                                            <input id="file-input" type="file" accept=".md,.markdown,.txt,.pdf,.docx" class="sr-only">
+                                            <input
+                                                id="file-input"
+                                                type="file"
+                                                accept=".md,.markdown,.txt,.pdf,.docx"
+                                                class="sr-only"
+                                            />
                                         </label>
                                         <p class="pl-1">드래그 앤 드롭하세요</p>
                                     </div>
-                                    <p class="text-xs text-gray-500">MD, TXT, PDF, DOCX 파일 지원</p>
+                                    <p class="text-xs text-gray-500">
+                                        MD, TXT, PDF, DOCX 파일 지원
+                                    </p>
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div>
-                            <label for="file-path" class="block text-sm font-medium text-gray-700">저장 경로 (선택사항)</label>
-                            <select id="file-path" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            <label
+                                for="file-path"
+                                class="block text-sm font-medium text-gray-700"
+                                >저장 경로 (선택사항)</label
+                            >
+                            <select
+                                id="file-path"
+                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                            >
                                 <option value="">기본 경로</option>
                                 <option value="documents/">documents/</option>
-                                <option value="documents/incoming/">documents/incoming/</option>
-                                <option value="documents/notes/">documents/notes/</option>
+                                <option value="documents/incoming/">
+                                    documents/incoming/
+                                </option>
+                                <option value="documents/notes/">
+                                    documents/notes/
+                                </option>
                             </select>
                         </div>
-                        
+
                         <div class="flex items-center justify-between">
-                            <button type="button" onclick="uploadFile()"
-                                    class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <button
+                                type="button"
+                                onclick="uploadFile()"
+                                class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
                                 📤 업로드 & 분류
                             </button>
-                            
+
                             <div id="file-loading" class="hidden">
                                 <div class="flex items-center text-gray-500">
-                                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    <svg
+                                        class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <circle
+                                            class="opacity-25"
+                                            cx="12"
+                                            cy="12"
+                                            r="10"
+                                            stroke="currentColor"
+                                            stroke-width="4"
+                                        ></circle>
+                                        <path
+                                            class="opacity-75"
+                                            fill="currentColor"
+                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                        ></path>
                                     </svg>
                                     처리 중...
                                 </div>
@@ -80,28 +143,61 @@
                 </div>
 
                 <!-- 텍스트 입력 폼 (숨김) -->
-                <form id="text-form" class="hidden" hx-post="/classify" hx-target="#result" hx-indicator="#loading">
+                <form
+                    id="text-form"
+                    class="hidden"
+                    hx-post="/classify"
+                    hx-target="#result"
+                    hx-indicator="#loading"
+                >
                     <div class="space-y-4">
-                        <input type="hidden" name="title" value="(제목 없음)">
-                        
+                        <input type="hidden" name="title" value="(제목 없음)" />
+
                         <div>
-                            <label for="body" class="block text-sm font-medium text-gray-700">문서 내용</label>
-                            <textarea name="body" id="body" rows="12" required
-                                      class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                      placeholder="분류할 텍스트를 입력하세요..."></textarea>
+                            <label
+                                for="body"
+                                class="block text-sm font-medium text-gray-700"
+                                >문서 내용</label
+                            >
+                            <textarea
+                                name="body"
+                                id="body"
+                                rows="12"
+                                required
+                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                placeholder="분류할 텍스트를 입력하세요..."
+                            ></textarea>
                         </div>
-                        
+
                         <div class="flex items-center justify-between">
-                            <button type="submit"
-                                    class="bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                            <button
+                                type="submit"
+                                class="bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                            >
                                 🔍 텍스트 분류
                             </button>
-                            
+
                             <div id="loading" class="htmx-indicator">
                                 <div class="flex items-center text-gray-500">
-                                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    <svg
+                                        class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <circle
+                                            class="opacity-25"
+                                            cx="12"
+                                            cy="12"
+                                            r="10"
+                                            stroke="currentColor"
+                                            stroke-width="4"
+                                        ></circle>
+                                        <path
+                                            class="opacity-75"
+                                            fill="currentColor"
+                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                        ></path>
                                     </svg>
                                     분류 중...
                                 </div>
@@ -110,15 +206,27 @@
                     </div>
                 </form>
             </div>
-            
+
             <!-- Results -->
             <div class="bg-white shadow rounded-lg p-6">
-                <h3 class="text-lg font-medium text-gray-900 mb-4">분류 결과</h3>
-                
+                <h3 class="text-lg font-medium text-gray-900 mb-4">
+                    분류 결과
+                </h3>
+
                 <div id="result">
                     <div class="text-center py-8 text-gray-500">
-                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        <svg
+                            class="mx-auto h-12 w-12 text-gray-400"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                            />
                         </svg>
                         <p class="mt-2">문서를 입력하고 분류를 실행하세요.</p>
                     </div>
@@ -129,108 +237,118 @@
 </div>
 
 <script>
-function showTab(tabName) {
-    // 탭 버튼 스타일 변경
-    document.querySelectorAll('.tab-button').forEach(btn => {
-        btn.classList.remove('active', 'border-blue-500', 'text-blue-600');
-        btn.classList.add('border-transparent', 'text-gray-500');
-    });
-    
-    document.getElementById(tabName + '-tab').classList.add('active', 'border-blue-500', 'text-blue-600');
-    document.getElementById(tabName + '-tab').classList.remove('border-transparent', 'text-gray-500');
-    
-    // 폼 표시/숨김
-    document.getElementById('text-form').classList.toggle('hidden', tabName !== 'text');
-    document.getElementById('file-form').classList.toggle('hidden', tabName !== 'file');
-}
-
-// 파일 드래그 앤 드롭 지원
-document.addEventListener('DOMContentLoaded', function() {
-    const fileInput = document.getElementById('file-input');
-    const dropZone = fileInput.closest('.border-dashed');
-    
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, preventDefaults, false);
-    });
-    
-    function preventDefaults(e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-    
-    ['dragenter', 'dragover'].forEach(eventName => {
-        dropZone.addEventListener(eventName, highlight, false);
-    });
-    
-    ['dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, unhighlight, false);
-    });
-    
-    function highlight(e) {
-        dropZone.classList.add('border-blue-400', 'bg-blue-50');
-    }
-    
-    function unhighlight(e) {
-        dropZone.classList.remove('border-blue-400', 'bg-blue-50');
-    }
-    
-    dropZone.addEventListener('drop', handleDrop, false);
-    
-    function handleDrop(e) {
-        const dt = e.dataTransfer;
-        const files = dt.files;
-        fileInput.files = files;
-    }
-});
-
-async function uploadFile() {
-    const fileInput = document.getElementById('file-input');
-    const pathInput = document.getElementById('file-path');
-    const loading = document.getElementById('file-loading');
-    const result = document.getElementById('result');
-    
-    if (!fileInput.files[0]) {
-        alert('파일을 선택해주세요.');
-        return;
-    }
-    
-    const file = fileInput.files[0];
-    const content = await file.text();
-    
-    loading.classList.remove('hidden');
-    
-    try {
-        const response = await fetch('/v1/upload', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                filename: file.name,
-                content: content,
-                path: pathInput.value || null
-            })
+    function showTab(tabName) {
+        // 탭 버튼 스타일 변경
+        document.querySelectorAll(".tab-button").forEach((btn) => {
+            btn.classList.remove("active", "border-blue-500", "text-blue-600");
+            btn.classList.add("border-transparent", "text-gray-500");
         });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            // 분류 결과 표시
-            const classification = data.classification;
-            let facetsHtml = '';
-            
-            for (const [namespace, values] of Object.entries(classification.facets)) {
-                facetsHtml += `
+
+        document
+            .getElementById(tabName + "-tab")
+            .classList.add("active", "border-blue-500", "text-blue-600");
+        document
+            .getElementById(tabName + "-tab")
+            .classList.remove("border-transparent", "text-gray-500");
+
+        // 폼 표시/숨김
+        document
+            .getElementById("text-form")
+            .classList.toggle("hidden", tabName !== "text");
+        document
+            .getElementById("file-form")
+            .classList.toggle("hidden", tabName !== "file");
+    }
+
+    // 파일 드래그 앤 드롭 지원
+    document.addEventListener("DOMContentLoaded", function () {
+        const fileInput = document.getElementById("file-input");
+        const dropZone = fileInput.closest(".border-dashed");
+
+        ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ["dragenter", "dragover"].forEach((eventName) => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+
+        ["dragleave", "drop"].forEach((eventName) => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            dropZone.classList.add("border-blue-400", "bg-blue-50");
+        }
+
+        function unhighlight(e) {
+            dropZone.classList.remove("border-blue-400", "bg-blue-50");
+        }
+
+        dropZone.addEventListener("drop", handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            fileInput.files = files;
+        }
+    });
+
+    async function uploadFile() {
+        const fileInput = document.getElementById("file-input");
+        const pathInput = document.getElementById("file-path");
+        const loading = document.getElementById("file-loading");
+        const result = document.getElementById("result");
+
+        if (!fileInput.files[0]) {
+            alert("파일을 선택해주세요.");
+            return;
+        }
+
+        const file = fileInput.files[0];
+        const content = await file.text();
+
+        loading.classList.remove("hidden");
+
+        try {
+            const response = await fetch("/v1/upload", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    filename: file.name,
+                    content: content,
+                    path: pathInput.value || null,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // 분류 결과 표시
+                const classification = data.classification;
+                let facetsHtml = "";
+
+                for (const [namespace, values] of Object.entries(
+                    classification.facets,
+                )) {
+                    facetsHtml += `
                     <div class="mb-3">
                         <span class="inline-block bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">${namespace}</span>
                         <div class="mt-1">
-                            ${values.map(v => `<span class="inline-block bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded mr-1">${v}</span>`).join('')}
+                            ${values.map((v) => `<span class="inline-block bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded mr-1">${v}</span>`).join("")}
                         </div>
                     </div>
                 `;
-            }
-            
-            result.innerHTML = `
+                }
+
+                result.innerHTML = `
                 <div class="bg-green-50 border border-green-200 rounded-md p-4">
                     <h4 class="text-lg font-medium text-green-800 mb-2">✅ 파일 업로드 완료</h4>
                     <p class="text-sm text-green-700 mb-4">파일: ${data.filename}</p>
@@ -241,21 +359,21 @@ async function uploadFile() {
                     </div>
                 </div>
             `;
-        } else {
-            throw new Error('Upload failed');
-        }
-    } catch (error) {
-        console.error('Upload error:', error);
-        result.innerHTML = `
+            } else {
+                throw new Error("Upload failed");
+            }
+        } catch (error) {
+            console.error("Upload error:", error);
+            result.innerHTML = `
             <div class="bg-red-50 border border-red-200 rounded-md p-4">
                 <h4 class="text-lg font-medium text-red-800">❌ 업로드 실패</h4>
                 <p class="text-sm text-red-700">파일 업로드 중 오류가 발생했습니다.</p>
-                <p class="text-xs text-red-600 mt-2">오류: ${error.message || '알 수 없는 오류'}</p>
+                <p class="text-xs text-red-600 mt-2">오류: ${error.message || "알 수 없는 오류"}</p>
             </div>
         `;
-    } finally {
-        loading.classList.add('hidden');
+        } finally {
+            loading.classList.add("hidden");
+        }
     }
-}
 </script>
 {% endblock %}

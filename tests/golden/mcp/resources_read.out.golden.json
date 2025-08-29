@@ -1,0 +1,13 @@
+{
+  "id": 4,
+  "jsonrpc": "2.0",
+  "result": {
+    "contents": [
+      {
+        "mimeType": "text",
+        "text": "<omitted>",
+        "uri": "doc://documents/RULES.md"
+      }
+    ]
+  }
+}

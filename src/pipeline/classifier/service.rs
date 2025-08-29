@@ -65,3 +65,7 @@ impl ClassifierService {
         Ok(engine.classify(title, body))
     }
 }
+
+impl Default for ClassifierService {
+    fn default() -> Self { Self::new() }
+}

@@ -95,7 +95,7 @@ impl Default for DocumentParser {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::LocalFsStorage;
+    use crate::drivers::storage::local::LocalFsStorage;
     use std::path::PathBuf;
     use tempfile::TempDir;
 
@@ -109,6 +109,9 @@ version: \"1.0.0\"
 schema: \"context.v1\"
 type: \"guide\"
 tags: [\"test\"]
+facets:
+  language: [\"rust\"]
+  type: [\"guide\"]
 sections:
   - id: \"intro\"
     name: \"Introduction\"
@@ -143,6 +146,9 @@ version: \"1.0.0\"
 schema: \"context.v1\"
 type: \"guide\"
 tags: [\"test\"]
+facets:
+  language: [\"rust\"]
+  type: [\"guide\"]
 sections:
   - id: \"content\"
     name: \"Content\"

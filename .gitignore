@@ -1,5 +1,5 @@
 # =============================================================================
-# CtxSet Project .gitignore
+# Ctx Project .gitignore
 # Rust CLI 도구 및 라이브러리 프로젝트용 포괄적인 ignore 설정
 # =============================================================================
 
@@ -257,10 +257,10 @@ pip-delete-this-directory.txt
 # 프로젝트 특화 설정
 # -----------------------------------------------------------------------------
 
-# CtxSet 특화 파일들
+# Ctx 특화 파일들
 test_contexts/generated/
 contexts/temp/
-*.ctxset.cache
+*.ctx.cache
 ctxindex.db-shm
 ctxindex.db-wal
 log.md

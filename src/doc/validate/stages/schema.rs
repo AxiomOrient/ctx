@@ -42,7 +42,7 @@ impl ValidationStage for SchemaValidationStage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::SectionDef;
+    use crate::domain::types::SectionDef;
 
     #[test]
     fn test_schema_validation_stage() {

@@ -2,7 +2,7 @@
 
 ## Overview
 
-CTXSET의 구현 설계는 기존의 잘 구조화된 6-레이어 아키텍처를 기반으로 하여 누락된 핵심 구현을 완성하는 것입니다. 이 설계는 결정성(determinism)과 유사-결정성(similarity-stable) 정책을 중심으로 하며, 확장 가능하고 유지보수 가능한 시스템을 목표로 합니다.
+ctx의 구현 설계는 기존의 잘 구조화된 6-레이어 아키텍처를 기반으로 하여 누락된 핵심 구현을 완성하는 것입니다. 이 설계는 결정성(determinism)과 유사-결정성(similarity-stable) 정책을 중심으로 하며, 확장 가능하고 유지보수 가능한 시스템을 목표로 합니다.
 
 ## Architecture
 
@@ -43,7 +43,7 @@ common/        # 공통 타입/상수/에러
 ### Key Design Principles
 
 1. **Deterministic Execution**: 동일 입력 → 동일 출력
-2. **Similarity-stable**: 유사 입력 → 유사 출력  
+2. **Similarity-stable**: 유사 입력 → 유사 출력
 3. **Centralized Constants**: 모든 임계값/가중치는 constants/에서 관리
 4. **Layered Dependencies**: 단방향 의존성 (app → core → data/doc/knowledge → common)
 5. **Feature Flags**: 선택적 컴파일 (server, cli, mcp)
@@ -70,13 +70,13 @@ impl BuildComposer {
     ) -> Result<CompositionResult> {
         // 1. Score documents
         let scored = self.scorer.score_documents(&candidates, query)?;
-        
+
         // 2. Select optimal subset (MMR algorithm)
         let selected = self.selector.select_documents(scored, budget, reserve)?;
-        
+
         // 3. Merge into single document
         let merged = self.merger.merge_documents(selected, query)?;
-        
+
         Ok(CompositionResult {
             merged_document: merged,
             selection_rationale: self.generate_rationale(),
@@ -104,10 +104,10 @@ impl DocumentScorer {
     ) -> Result<Vec<ScoredCandidate>> {
         // Multi-criteria scoring with weighted combination
     }
-    
+
     pub fn calculate_similarity(
-        &self, 
-        a: &DocumentCandidate, 
+        &self,
+        a: &DocumentCandidate,
         b: &DocumentCandidate
     ) -> f32 {
         // Jaccard + Trigram similarity
@@ -132,16 +132,16 @@ impl DocumentSelector {
         reserve: usize,
     ) -> Result<Vec<ScoredCandidate>> {
         let effective_budget = budget.saturating_sub(reserve);
-        
+
         // Phase 1: Greedy selection by score (fast path for small sets)
         if scored.len() <= 10 {
             return self.greedy_selection(scored, effective_budget);
         }
-        
+
         // Phase 2: MMR selection for larger sets
         self.mmr_selection(scored, effective_budget)
     }
-    
+
     fn mmr_selection(
         &self,
         mut candidates: Vec<ScoredCandidate>,
@@ -149,19 +149,19 @@ impl DocumentSelector {
     ) -> Result<Vec<ScoredCandidate>> {
         let mut selected = Vec::new();
         let mut remaining_budget = budget;
-        
+
         // Sort by relevance score initially
         candidates.sort_by(|a, b| b.base_score.partial_cmp(&a.base_score).unwrap_or(Ordering::Equal));
-        
+
         while !candidates.is_empty() && remaining_budget > 0 {
             let mut best_idx = 0;
             let mut best_mmr_score = f32::NEG_INFINITY;
-            
+
             for (idx, candidate) in candidates.iter().enumerate() {
                 if candidate.candidate.tokens > remaining_budget {
                     continue; // Skip if doesn't fit
                 }
-                
+
                 // Calculate diversity score (average similarity to selected documents)
                 let diversity_score = if selected.is_empty() {
                     1.0 // First document has maximum diversity
@@ -171,29 +171,29 @@ impl DocumentSelector {
                         .sum::<f32>() / selected.len() as f32;
                     1.0 - avg_similarity // Higher diversity = lower similarity
                 };
-                
+
                 // MMR score: (1-λ) * relevance + λ * diversity
-                let mmr_score = (1.0 - self.mmr_lambda) * candidate.base_score 
+                let mmr_score = (1.0 - self.mmr_lambda) * candidate.base_score
                               + self.mmr_lambda * diversity_score;
-                
+
                 if mmr_score > best_mmr_score {
                     best_mmr_score = mmr_score;
                     best_idx = idx;
                 }
             }
-            
+
             if best_mmr_score == f32::NEG_INFINITY {
                 break; // No more documents fit in budget
             }
-            
+
             let selected_doc = candidates.remove(best_idx);
             remaining_budget = remaining_budget.saturating_sub(selected_doc.candidate.tokens);
             selected.push(selected_doc);
         }
-        
+
         Ok(selected)
     }
-    
+
     fn greedy_selection(
         &self,
         mut candidates: Vec<ScoredCandidate>,
@@ -201,17 +201,17 @@ impl DocumentSelector {
     ) -> Result<Vec<ScoredCandidate>> {
         // Simple greedy selection for small sets
         candidates.sort_by(|a, b| b.base_score.partial_cmp(&a.base_score).unwrap_or(Ordering::Equal));
-        
+
         let mut selected = Vec::new();
         let mut remaining_budget = budget;
-        
+
         for candidate in candidates {
             if candidate.candidate.tokens <= remaining_budget {
                 remaining_budget -= candidate.candidate.tokens;
                 selected.push(candidate);
             }
         }
-        
+
         Ok(selected)
     }
 }
@@ -234,25 +234,25 @@ impl DocumentMerger {
         if documents.is_empty() {
             return Ok(MergedDocument::empty());
         }
-        
+
         // 1. Sort by score (highest first)
         documents.sort_by(|a, b| b.base_score.partial_cmp(&a.base_score).unwrap_or(Ordering::Equal));
-        
+
         let mut merged_content = String::new();
         let mut source_documents = Vec::new();
         let mut sections = Vec::new();
         let mut total_tokens = 0;
-        
+
         // 2. Add header with context information
         merged_content.push_str(&format!(
             "# Context Composition\n\n**Repository:** {}\n**Branch:** {}\n**Commit:** {}\n\n",
             query.repo, query.branch, query.commit_sha
         ));
-        
+
         // 3. Process each document
         for (idx, scored_doc) in documents.iter().enumerate() {
             let doc = &scored_doc.candidate;
-            
+
             // Load document content if not already loaded
             let content = if let Some(ref content) = doc.content {
                 content.clone()
@@ -260,7 +260,7 @@ impl DocumentMerger {
                 std::fs::read_to_string(&doc.path)
                     .unwrap_or_else(|_| format!("⚠️ Could not load: {}", doc.path))
             };
-            
+
             // 4. Add section header with metadata
             let section_header = format!(
                 "## Document {}: {}\n\n**Source:** `{}`  \n**Confidence:** {:.2}  \n**Trust:** {:.2}  \n**Freshness:** {}  \n\n",
@@ -271,11 +271,11 @@ impl DocumentMerger {
                 doc.trust,
                 doc.freshness
             );
-            
+
             merged_content.push_str(&section_header);
             merged_content.push_str(&content);
             merged_content.push_str("\n\n---\n\n");
-            
+
             // 5. Track metadata
             source_documents.push(doc.doc_id.clone());
             sections.push(MergedSection {
@@ -284,10 +284,10 @@ impl DocumentMerger {
                 source_doc_id: doc.doc_id.clone(),
                 confidence: doc.confidence,
             });
-            
+
             total_tokens += doc.tokens;
         }
-        
+
         // 6. Add footer with composition metadata
         merged_content.push_str(&format!(
             "---\n\n**Composition Summary:**\n- Documents: {}\n- Total Tokens: ~{}\n- Generated: {}\n",
@@ -295,10 +295,10 @@ impl DocumentMerger {
             total_tokens,
             chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")
         ));
-        
+
         // 7. Recalculate final token count (may differ due to headers)
         let final_tokens = self.tokenizer.estimate_tokens(&merged_content) as usize;
-        
+
         Ok(MergedDocument {
             content: merged_content,
             source_documents,
@@ -330,13 +330,13 @@ impl ApiValidator {
     pub fn validate_classify_request(req: &ClassifyRequest) -> Result<()> {
         // Validate text length, metadata format
     }
-    
+
     pub fn validate_compose_request(req: &ComposeRequest) -> Result<()> {
         // Validate repo/branch/sha format
         // Check facets against ontology
         // Validate token budget limits
     }
-    
+
     pub fn apply_intent_gate(
         facets: &HashMap<String, Vec<String>>,
         task_contract: &TaskContract,
@@ -372,14 +372,14 @@ impl DeterminismEngine {
             db_path,
         }
     }
-    
+
     pub fn get_or_compute_execution_id(
         &self,
         canonical_input: &CanonicalInput,
         context: &ExecutionContext,
     ) -> String {
         use sha2::{Sha256, Digest};
-        
+
         let mut hasher = Sha256::new();
         hasher.update(&canonical_input.normalized_text);
         hasher.update(&serde_json::to_string(&canonical_input.facets).unwrap_or_default());
@@ -387,10 +387,10 @@ impl DeterminismEngine {
         hasher.update(&context.recipe_version);
         hasher.update(&context.commit_sha);
         hasher.update(&context.constants_version);
-        
+
         format!("{:x}", hasher.finalize())[..16].to_string()
     }
-    
+
     pub async fn check_similarity_stable(
         &self,
         current_input: &CanonicalInput,
@@ -398,14 +398,14 @@ impl DeterminismEngine {
     ) -> Result<Option<CompositionResult>> {
         // 1. Check in-memory cache first
         let current_hash = self.hash_canonical_input(current_input);
-        
+
         if let Some(cached) = self.cache.read().unwrap().get(&current_hash) {
             return Ok(Some(cached.result.clone()));
         }
-        
+
         // 2. Check database for similar inputs
         let similar_results = self.find_similar_in_db(&current_hash, current_input).await?;
-        
+
         for (similarity_score, cached_result) in similar_results {
             if similarity_score >= self.similarity_threshold {
                 // Cache the result for future use
@@ -414,14 +414,14 @@ impl DeterminismEngine {
                     result: cached_result.clone(),
                     created_at: Utc::now(),
                 });
-                
+
                 return Ok(Some(cached_result));
             }
         }
-        
+
         Ok(None)
     }
-    
+
     pub fn canonicalize_input(&self, raw_input: &str, facets: &HashMap<String, Vec<String>>) -> CanonicalInput {
         let normalized_text = self.normalize_text(raw_input);
         let sorted_facets: BTreeMap<String, Vec<String>> = facets.iter()
@@ -431,53 +431,53 @@ impl DeterminismEngine {
                 (k.clone(), sorted_values)
             })
             .collect();
-        
+
         CanonicalInput {
             normalized_text,
             facets: sorted_facets,
             metadata: HashMap::new(), // TODO: Add relevant metadata
         }
     }
-    
+
     fn normalize_text(&self, text: &str) -> String {
         use regex::Regex;
-        
+
         let mut normalized = text.to_string();
-        
+
         // 1. Normalize whitespace
         normalized = Regex::new(r"\s+").unwrap().replace_all(&normalized, " ").to_string();
-        
+
         // 2. Normalize markdown headers
         normalized = Regex::new(r"#{1,6}\s+").unwrap().replace_all(&normalized, "# ").to_string();
-        
+
         // 3. Normalize code fences
         normalized = Regex::new(r"```\w*\n").unwrap().replace_all(&normalized, "```\n").to_string();
-        
+
         // 4. Normalize file paths (convert to forward slashes)
         normalized = normalized.replace('\\', "/");
-        
+
         // 5. Normalize URLs (remove trailing slashes)
         normalized = Regex::new(r"https?://[^\s]+/+").unwrap()
             .replace_all(&normalized, |caps: &regex::Captures| {
                 caps[0].trim_end_matches('/').to_string()
             }).to_string();
-        
+
         // 6. Normalize dates to ISO format (basic attempt)
         // This is a simplified version - production would need more robust date parsing
-        
+
         normalized.trim().to_string()
     }
-    
+
     fn hash_canonical_input(&self, input: &CanonicalInput) -> String {
         use sha2::{Sha256, Digest};
-        
+
         let mut hasher = Sha256::new();
         hasher.update(&input.normalized_text);
         hasher.update(&serde_json::to_string(&input.facets).unwrap_or_default());
-        
+
         format!("{:x}", hasher.finalize())[..16].to_string()
     }
-    
+
     async fn find_similar_in_db(
         &self,
         current_hash: &str,
@@ -490,24 +490,24 @@ impl DeterminismEngine {
         // 3. Return sorted by similarity
         Ok(vec![])
     }
-    
+
     pub async fn store_result(
         &self,
         input: &CanonicalInput,
         result: &CompositionResult,
     ) -> Result<()> {
         let input_hash = self.hash_canonical_input(input);
-        
+
         // Store in memory cache
         self.cache.write().unwrap().put(input_hash.clone(), CachedResult {
             execution_id: result.execution_id.clone(),
             result: result.clone(),
             created_at: Utc::now(),
         });
-        
+
         // Store in database for persistence
         // Implementation would insert into execution_cache table
-        
+
         Ok(())
     }
 }
@@ -600,7 +600,7 @@ CREATE INDEX IF NOT EXISTS idx_doc_facets_namespace_value ON doc_facets(namespac
 CREATE INDEX IF NOT EXISTS idx_classify_log_confidence ON classify_log(confidence DESC);
 
 -- Performance optimization: covering index for common queries
-CREATE INDEX IF NOT EXISTS idx_docs_covering ON docs(doc_id, repo, branch, sha, title, path, valid_from) 
+CREATE INDEX IF NOT EXISTS idx_docs_covering ON docs(doc_id, repo, branch, sha, title, path, valid_from)
     WHERE valid_to IS NULL AND deleted = 0;
 ```
 
@@ -613,23 +613,23 @@ CREATE INDEX IF NOT EXISTS idx_docs_covering ON docs(doc_id, repo, branch, sha, 
 #[derive(Debug, thiserror::Error)]
 pub enum ContextError {
     // ... existing variants ...
-    
+
     #[error("Intent gate violation: {category} does not allow {action}. Allowed: {allowed:?}")]
     IntentGateViolation {
         category: String,
         action: String,
         allowed: Vec<String>,
     },
-    
+
     #[error("Token budget exceeded: requested {requested}, available {available}")]
     TokenBudgetExceeded {
         requested: usize,
         available: usize,
     },
-    
+
     #[error("Similarity computation failed: {reason}")]
     SimilarityError { reason: String },
-    
+
     #[error("Determinism violation: execution ID mismatch")]
     DeterminismViolation,
 }
@@ -757,7 +757,7 @@ pub fn get_version_hash() -> String {
 2. **Monitoring**: Health checks, metrics collection
 3. **Logging**: Structured logging with appropriate levels
 4. **Graceful Shutdown**: Handle SIGTERM properly
-5. **Resource Management**: Memory and file handle limits## 
+5. **Resource Management**: Memory and file handle limits##
 Implementation Phases
 
 ### Phase 1: Core Foundation (High Priority)
@@ -787,7 +787,7 @@ For the initial implementation, we can simplify some complex features:
 - Add similarity-stable features in Phase 3
 - Use simple in-memory cache initially
 
-### MMR Algorithm Simplification  
+### MMR Algorithm Simplification
 - Start with greedy selection for all cases
 - Add full MMR implementation once basic functionality works
 - Use simple diversity metric (document type/category differences)

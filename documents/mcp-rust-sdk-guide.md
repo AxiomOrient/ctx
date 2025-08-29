@@ -80,15 +80,15 @@ edition = "2021"
 
 [dependencies]
 # MCP 공식 SDK
-rmcp = { 
-    git = "https://github.com/modelcontextprotocol/rust-sdk", 
-    branch = "main", 
+rmcp = {
+    git = "https://github.com/modelcontextprotocol/rust-sdk",
+    branch = "main",
     features = [
         "server",        # 서버 기능
         "transport-io",  # stdio 전송
         "macros",        # 매크로 지원
         "schemars"       # JSON 스키마 생성
-    ] 
+    ]
 }
 
 # 비동기 런타임
@@ -108,23 +108,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # CLI (선택사항)
 clap = { version = "4.0", features = ["derive"] }
-```
-
-### 프로젝트 구조
-
-```
-my-mcp-server/
-├── Cargo.toml
-├── src/
-│   ├── main.rs          # 메인 엔트리포인트
-│   ├── server.rs        # 서버 구현
-│   ├── tools/           # 도구 구현
-│   │   ├── mod.rs
-│   │   ├── calculator.rs
-│   │   └── file_ops.rs
-│   └── types.rs         # 타입 정의
-├── tests/               # 통합 테스트
-└── examples/            # 예제 코드
 ```
 
 ## 기본 서버 구현
@@ -185,7 +168,7 @@ async fn main() -> anyhow::Result<()> {
     // 서버 생성 및 실행
     let server = MyMcpServer::new();
     let service = server.serve(stdio()).await?;
-    
+
     service.waiting().await?;
     Ok(())
 }
@@ -218,7 +201,7 @@ impl MyMcpServer {
             "divide" => {
                 if req.b == 0.0 {
                     return Err(McpError::invalid_params(
-                        "Division by zero", 
+                        "Division by zero",
                         Some(json!({"divisor": req.b}))
                     ));
                 }
@@ -226,7 +209,7 @@ impl MyMcpServer {
             }
             _ => {
                 return Err(McpError::invalid_params(
-                    "Invalid operation", 
+                    "Invalid operation",
                     Some(json!({"operation": req.operation}))
                 ));
             }
@@ -251,13 +234,13 @@ impl MyMcpServer {
     async fn long_operation(&self, duration_secs: u64) -> Result<CallToolResult, McpError> {
         if duration_secs > 60 {
             return Err(McpError::invalid_params(
-                "Duration too long (max 60 seconds)", 
+                "Duration too long (max 60 seconds)",
                 None
             ));
         }
 
         sleep(Duration::from_secs(duration_secs)).await;
-        
+
         Ok(CallToolResult::success(vec![
             Content::text(format!("Operation completed after {} seconds", duration_secs))
         ]))
@@ -303,7 +286,7 @@ impl ServerHandler for MyMcpServer {
                     "version": "1.0.0",
                     "features": ["tools", "resources"]
                 });
-                
+
                 Ok(ReadResourceResult {
                     contents: vec![ResourceContents::text(
                         serde_json::to_string_pretty(&config).unwrap(),
@@ -413,7 +396,7 @@ impl StatefulServer {
     async fn store(&self, key: String, value: String) -> Result<CallToolResult, McpError> {
         let mut state = self.state.write().await;
         state.insert(key.clone(), value.clone());
-        
+
         Ok(CallToolResult::success(vec![
             Content::text(format!("Stored: {} = {}", key, value))
         ]))
@@ -422,13 +405,13 @@ impl StatefulServer {
     #[tool(description = "Retrieve a value by key")]
     async fn retrieve(&self, key: String) -> Result<CallToolResult, McpError> {
         let state = self.state.read().await;
-        
+
         match state.get(&key) {
             Some(value) => Ok(CallToolResult::success(vec![
                 Content::text(format!("{} = {}", key, value))
             ])),
             None => Err(McpError::invalid_params(
-                "Key not found", 
+                "Key not found",
                 Some(json!({"key": key}))
             ))
         }
@@ -481,7 +464,7 @@ impl ApiIntegrationServer {
             .send()
             .await
             .map_err(|e| McpError::internal_error(
-                "Failed to fetch weather data", 
+                "Failed to fetch weather data",
                 Some(json!({"error": e.to_string()}))
             ))?;
 
@@ -501,7 +484,7 @@ impl ApiIntegrationServer {
             ))?;
 
         Ok(CallToolResult::success(vec![
-            Content::text(format!("Weather data: {}", 
+            Content::text(format!("Weather data: {}",
                 serde_json::to_string_pretty(&weather_data).unwrap()
             ))
         ]))
@@ -570,10 +553,10 @@ async fn main() -> anyhow::Result<()> {
     // 서버 생성 및 실행
     let server = ApiIntegrationServer::new(args.api_url);
     let service = server.serve(stdio()).await?;
-    
+
     tracing::info!("MCP server started");
     service.waiting().await?;
-    
+
     Ok(())
 }
 ```
@@ -589,7 +572,7 @@ async fn main() -> anyhow::Result<()> {
 error: cannot find attribute `tool` in this scope
 ```
 
-**해결책**: 
+**해결책**:
 ```rust
 // 필요한 매크로 import 확인
 use rmcp::{tool, tool_handler, tool_router};
@@ -728,7 +711,7 @@ impl CachedServer {
 
         // 캐시 미스 - 새 데이터 가져오기
         let data = self.fetch_data(key).await?;
-        
+
         // 캐시 업데이트
         {
             let mut cache = self.cache.write().await;
@@ -762,12 +745,12 @@ struct BatchProcessor {
 impl BatchProcessor {
     fn new() -> Self {
         let (sender, mut receiver) = mpsc::unbounded_channel();
-        
+
         // 배치 처리 태스크 시작
         tokio::spawn(async move {
             let mut batch = Vec::new();
             let mut interval = interval(Duration::from_secs(5));
-            
+
             loop {
                 tokio::select! {
                     item = receiver.recv() => {
@@ -877,10 +860,10 @@ fn load_config() -> Config {
 enum ServerError {
     #[error("Database connection failed: {0}")]
     Database(#[from] sqlx::Error),
-    
+
     #[error("HTTP request failed: {0}")]
     Http(#[from] reqwest::Error),
-    
+
     #[error("Invalid input: {message}")]
     InvalidInput { message: String },
 }
@@ -908,9 +891,9 @@ impl MyServer {
     #[tool(description = "Calculate something")]
     async fn calculate(&self, input: f64) -> Result<CallToolResult, McpError> {
         info!(input = %input, "Starting calculation");
-        
+
         let result = input * 2.0;
-        
+
         info!(result = %result, "Calculation completed");
         Ok(CallToolResult::success(vec![
             Content::text(result.to_string())

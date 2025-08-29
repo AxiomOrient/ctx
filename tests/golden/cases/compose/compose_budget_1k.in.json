@@ -1,0 +1,7 @@
+{
+  "query": "Produce a compact context suitable for 1000 tokens budget about MCP integration and rmcp SDK usage steps.",
+  "tags": ["mcp", "sdk"],
+  "max_tokens": 1000,
+  "exclude_sources": null,
+  "priority_sources": null
+}

@@ -13,19 +13,20 @@ pub fn run_parse(args: ParseArgs) -> Result<()> {
     println!("📝 Parsing file: {}", args.file.display());
     
     let content = std::fs::read_to_string(&args.file)
-        .map_err(|e| crate::domain::errors::ContextError::Io(e))?;
+        .map_err(crate::domain::errors::ContextError::Io)?;
     
     // Simple frontmatter extraction (placeholder)
-    if content.starts_with("---") {
-        if let Some(end_pos) = content[3..].find("---") {
-            let frontmatter = &content[3..end_pos + 3];
+    if let Some(rest) = content.strip_prefix("---") {
+        if let Some(end_pos) = rest.find("---") {
+            let frontmatter = &rest[..end_pos];
             
             match args.format.as_str() {
                 "json" => {
                     // Try to parse as YAML first, then convert to JSON
-                    match serde_yaml::from_str::<serde_json::Value>(frontmatter) {
-                        Ok(value) => println!("{}", serde_json::to_string_pretty(&value)?),
-                        Err(_) => println!("Invalid YAML frontmatter"),
+                    if let Ok(value) = serde_yaml::from_str::<serde_json::Value>(frontmatter) {
+                        println!("{}", serde_json::to_string_pretty(&value)?);
+                    } else {
+                        println!("Invalid YAML frontmatter");
                     }
                 },
                 _ => println!("{}", frontmatter),

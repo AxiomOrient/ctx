@@ -16,7 +16,7 @@
 ## 사용법
 
 ```rust
-use ctxset::dependency::{DependencyGraphManager, StandardDependencyGraphManager};
+use ctx::dependency::{DependencyGraphManager, StandardDependencyGraphManager};
 
 let manager = StandardDependencyGraphManager::new();
 // 의존성 분석 로직

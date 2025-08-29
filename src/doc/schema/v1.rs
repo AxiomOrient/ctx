@@ -262,7 +262,7 @@ impl SchemaValidator for V1SchemaValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ContextDocument, SectionDef};
+    use crate::domain::types::{ContextDocument, SectionDef};
 
     fn create_valid_document() -> ContextDocument {
         let mut doc = ContextDocument::new_test("RUST-API-GUIDE", "Rust API Development Guide");
@@ -270,6 +270,8 @@ mod tests {
         doc.tags = vec!["rust".to_string(), "api".to_string()];
         doc.author = Some("test".to_string());
         doc.estimated_tokens = Some(800);
+        doc.facets.insert("language".to_string(), vec!["rust".to_string()]);
+        doc.facets.insert("type".to_string(), vec!["guide".to_string()]);
         doc.sections = vec![SectionDef {
             id: "intro".to_string(),
             name: "Introduction".to_string(),
