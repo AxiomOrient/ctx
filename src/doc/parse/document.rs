@@ -81,8 +81,77 @@ impl DocumentParser {
 
     /// frontmatter YAML을 ContextDocument로 파싱
     fn parse_frontmatter_to_document(&self, frontmatter: &str) -> Result<ContextDocument> {
-        serde_yaml::from_str(frontmatter)
-            .map_err(|e| ContextError::InvalidFrontmatter(format!("YAML parsing failed: {}", e)))
+        // 빈 frontmatter 처리
+        if frontmatter.trim().is_empty() {
+            return Ok(ContextDocument::default());
+        }
+
+        // 부분 YAML을 전체 ContextDocument로 병합
+        match serde_yaml::from_str::<serde_yaml::Value>(frontmatter) {
+            Ok(yaml_value) => {
+                // 기본 ContextDocument 생성
+                let mut doc = ContextDocument::default();
+                
+                // YAML 값이 객체인 경우에만 처리
+                if let serde_yaml::Value::Mapping(map) = yaml_value {
+                    // 각 필드를 개별적으로 처리하여 누락된 필드를 기본값으로 채움
+                    if let Some(id_val) = map.get(&serde_yaml::Value::String("id".to_string())) {
+                        if let Some(id_str) = id_val.as_str() {
+                            doc.id = id_str.to_string();
+                        }
+                    }
+                    
+                    if let Some(title_val) = map.get(&serde_yaml::Value::String("title".to_string())) {
+                        if let Some(title_str) = title_val.as_str() {
+                            doc.title = title_str.to_string();
+                        }
+                    }
+                    
+                    if let Some(type_val) = map.get(&serde_yaml::Value::String("type".to_string())) {
+                        if let Some(type_str) = type_val.as_str() {
+                            doc.r#type = type_str.to_string();
+                        }
+                    }
+                    
+                    if let Some(version_val) = map.get(&serde_yaml::Value::String("version".to_string())) {
+                        if let Some(version_str) = version_val.as_str() {
+                            doc.version = version_str.to_string();
+                        }
+                    }
+                    
+                    if let Some(schema_val) = map.get(&serde_yaml::Value::String("schema".to_string())) {
+                        if let Some(schema_str) = schema_val.as_str() {
+                            doc.schema = schema_str.to_string();
+                        }
+                    }
+                    
+                    if let Some(tags_val) = map.get(&serde_yaml::Value::String("tags".to_string())) {
+                        if let serde_yaml::Value::Sequence(seq) = tags_val {
+                            doc.tags = seq.iter()
+                                .filter_map(|v| v.as_str())
+                                .map(|s| s.to_string())
+                                .collect();
+                        }
+                    }
+
+                    // 기타 옵션 필드들도 비슷하게 처리
+                    if let Some(author_val) = map.get(&serde_yaml::Value::String("author".to_string())) {
+                        if let Some(author_str) = author_val.as_str() {
+                            doc.author = Some(author_str.to_string());
+                        }
+                    }
+
+                    if let Some(domain_val) = map.get(&serde_yaml::Value::String("domain".to_string())) {
+                        if let Some(domain_str) = domain_val.as_str() {
+                            doc.domain = Some(domain_str.to_string());
+                        }
+                    }
+                }
+                
+                Ok(doc)
+            }
+            Err(e) => Err(ContextError::InvalidFrontmatter(format!("YAML parsing failed: {}", e)))
+        }
     }
 }
 

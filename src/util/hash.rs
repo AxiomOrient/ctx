@@ -278,6 +278,24 @@ pub fn deterministic_hash(input: &str) -> String {
     format!("{:016x}", hash)
 }
 
+/// Generate a deterministic document ID from base path and file path
+pub fn generate_document_id(base_path: &std::path::Path, file_path: &std::path::Path) -> Result<String, ContextError> {
+    // Get the relative path from base to file
+    let rel_path = if file_path.is_absolute() {
+        file_path.strip_prefix(base_path)
+            .map_err(|_| ContextError::Other("File path is not under base path".to_string()))?
+    } else {
+        file_path
+    };
+    
+    // Create a deterministic ID from the relative path
+    let path_str = rel_path.to_string_lossy();
+    let hash = deterministic_hash(&path_str);
+    
+    // Use first 16 characters for reasonable ID length
+    Ok(hash[..16].to_string())
+}
+
 #[cfg(test)]
 #[allow(clippy::expect_used)]
 mod tests {

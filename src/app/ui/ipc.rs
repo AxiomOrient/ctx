@@ -75,22 +75,89 @@ pub struct UiError {
 
 pub fn to_ui_error(err: ContextError) -> UiError {
     match err {
-        ContextError::ParseError { line, message } => UiError { code: "E_PARSE_ERROR".into(), message, data: Some(json!({"line": line})) },
-        ContextError::InvalidFrontmatter(msg) => UiError { code: "E_INVALID_INPUT".into(), message: msg, data: None },
-        ContextError::MarkerNotFound { marker } => UiError { code: "E_NOT_FOUND".into(), message: format!("Marker '{}' not found", marker), data: None },
-        ContextError::SectionNotFound { section_id, available } => UiError { code: "E_NOT_FOUND".into(), message: format!("Section '{}' not found", section_id), data: Some(json!({"available": available})) },
-        ContextError::TokenBudgetExceeded { budget, excess } => UiError { code: "E_BUDGET_EXCEEDED".into(), message: format!("Budget {} exceeded by {}", budget, excess), data: Some(json!({"budget": budget, "excess": excess})) },
-        ContextError::ConfigError(msg) => UiError { code: "E_CONFIG".into(), message: msg, data: None },
-        ContextError::Io(e) => UiError { code: "E_IO".into(), message: e.to_string(), data: None },
-        ContextError::YamlError(e) => UiError { code: "E_SERIALIZE".into(), message: e.to_string(), data: None },
-        ContextError::JsonError(e) => UiError { code: "E_SERIALIZE".into(), message: e.to_string(), data: None },
-        ContextError::ServerError(msg) => UiError { code: "E_INTERNAL".into(), message: msg, data: None },
-        ContextError::ClassificationError(msg) => UiError { code: "E_CLASSIFY".into(), message: msg, data: None },
-        ContextError::CompositionError(msg) => UiError { code: "E_COMPOSE".into(), message: msg, data: None },
-        ContextError::DatabaseError(e) => UiError { code: "E_DB".into(), message: e.to_string(), data: None },
-        ContextError::OptimizationError(msg) => UiError { code: "E_OPTIMIZE".into(), message: msg, data: None },
-        ContextError::AssemblyError(msg) => UiError { code: "E_ASSEMBLY".into(), message: msg, data: None },
-        ContextError::Other(msg) => UiError { code: "E_INTERNAL".into(), message: msg, data: None },
+        ContextError::ParseError { line, message } => UiError {
+            code: "E_PARSE_ERROR".into(),
+            message,
+            data: Some(json!({"line": line})),
+        },
+        ContextError::InvalidFrontmatter(msg) => UiError {
+            code: "E_INVALID_INPUT".into(),
+            message: msg,
+            data: None,
+        },
+        ContextError::MarkerNotFound { marker } => UiError {
+            code: "E_NOT_FOUND".into(),
+            message: format!("Marker '{}' not found", marker),
+            data: None,
+        },
+        ContextError::SectionNotFound {
+            section_id,
+            available,
+        } => UiError {
+            code: "E_NOT_FOUND".into(),
+            message: format!("Section '{}' not found", section_id),
+            data: Some(json!({"available": available})),
+        },
+        ContextError::TokenBudgetExceeded { budget, excess } => UiError {
+            code: "E_BUDGET_EXCEEDED".into(),
+            message: format!("Budget {} exceeded by {}", budget, excess),
+            data: Some(json!({"budget": budget, "excess": excess})),
+        },
+        ContextError::ConfigError(msg) => UiError {
+            code: "E_CONFIG".into(),
+            message: msg,
+            data: None,
+        },
+        ContextError::Io(e) => UiError {
+            code: "E_IO".into(),
+            message: e.to_string(),
+            data: None,
+        },
+        ContextError::YamlError(e) => UiError {
+            code: "E_SERIALIZE".into(),
+            message: e.to_string(),
+            data: None,
+        },
+        ContextError::JsonError(e) => UiError {
+            code: "E_SERIALIZE".into(),
+            message: e.to_string(),
+            data: None,
+        },
+        ContextError::ServerError(msg) => UiError {
+            code: "E_INTERNAL".into(),
+            message: msg,
+            data: None,
+        },
+        ContextError::ClassificationError(msg) => UiError {
+            code: "E_CLASSIFY".into(),
+            message: msg,
+            data: None,
+        },
+        ContextError::CompositionError(msg) => UiError {
+            code: "E_COMPOSE".into(),
+            message: msg,
+            data: None,
+        },
+        ContextError::DatabaseError(e) => UiError {
+            code: "E_DB".into(),
+            message: e.to_string(),
+            data: None,
+        },
+        ContextError::OptimizationError(msg) => UiError {
+            code: "E_OPTIMIZE".into(),
+            message: msg,
+            data: None,
+        },
+        ContextError::AssemblyError(msg) => UiError {
+            code: "E_ASSEMBLY".into(),
+            message: msg,
+            data: None,
+        },
+        ContextError::Other(msg) => UiError {
+            code: "E_INTERNAL".into(),
+            message: msg,
+            data: None,
+        },
     }
 }
 
@@ -114,8 +181,24 @@ async fn resolve_workspace_root() -> Result<PathBuf> {
 
 pub async fn select_workspace(path: String) -> Result<WorkspaceSummary> {
     let root = PathBuf::from(path.clone());
+    // 상대 경로를 절대 경로로 변환
+    let root = if root.is_absolute() {
+        root
+    } else {
+        std::env::current_dir()
+            .map_err(ContextError::Io)?
+            .join(root)
+            .canonicalize()
+            .map_err(ContextError::Io)?
+    };
+
+    tracing::info!("Setting workspace root to: {:?}", root);
+
     if !root.exists() || !root.is_dir() {
-        return Err(ContextError::ConfigError("invalid workspace root".into()));
+        return Err(ContextError::ConfigError(format!(
+            "invalid workspace root: {:?}",
+            root
+        )));
     }
     {
         let mut state = UI_STATE.write().await;
@@ -123,43 +206,108 @@ pub async fn select_workspace(path: String) -> Result<WorkspaceSummary> {
     }
     let storage = LocalFsStorage::new(root.clone());
     let files = storage.list_files(Path::new("."), "*.md")?;
-    Ok(WorkspaceSummary { root: path, doc_count: files.len() })
+    Ok(WorkspaceSummary {
+        root: root.to_string_lossy().to_string(),
+        doc_count: files.len(),
+    })
 }
 
 pub async fn reindex() -> Result<IndexSummary> {
     let root = resolve_workspace_root().await?;
     let storage = LocalFsStorage::new(root);
     let files = storage.list_files(Path::new("."), "*.md")?;
-    Ok(IndexSummary { total: files.len(), errors: 0 })
+    Ok(IndexSummary {
+        total: files.len(),
+        errors: 0,
+    })
 }
 
 pub async fn list_documents(_filter: Option<String>) -> Result<Vec<DocMeta>> {
     let root = resolve_workspace_root().await?;
     let storage = LocalFsStorage::new(root.clone());
     let files = storage.list_files(Path::new("."), "*.md")?;
+
     let mut out = Vec::new();
     let parser = crate::doc::parse::DocumentParser::new();
     for p in files {
         let doc = parser.parse_file(&storage, &p).unwrap_or_default();
+
+        // path에서 "documents/" 접두사 제거 (워크스페이스 루트 기준 상대 경로로 만들기)
+        let relative_path = p.strip_prefix("documents/").unwrap_or(&p);
+
         let meta = DocMeta {
-            id: if doc.id.is_empty() { p.file_stem().and_then(|s| s.to_str()).unwrap_or_default().to_string() } else { doc.id },
-            path: p.to_string_lossy().to_string(),
+            id: if doc.id.is_empty() {
+                p.file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or_default()
+                    .to_string()
+            } else {
+                doc.id
+            },
+            path: relative_path.to_string_lossy().to_string(),
             tags: doc.tags,
             sections: doc.sections.len(),
-            mtime: std::fs::metadata(root.join(&p)).ok().and_then(|m| m.modified().ok()).and_then(to_unix_ts),
+            mtime: std::fs::metadata(root.join(&p))
+                .ok()
+                .and_then(|m| m.modified().ok())
+                .and_then(to_unix_ts),
         };
         out.push(meta);
     }
     Ok(out)
 }
 
-fn to_unix_ts(t: SystemTime) -> Option<i64> { t.duration_since(SystemTime::UNIX_EPOCH).ok().map(|d| d.as_secs() as i64) }
+fn to_unix_ts(t: SystemTime) -> Option<i64> {
+    t.duration_since(SystemTime::UNIX_EPOCH)
+        .ok()
+        .map(|d| d.as_secs() as i64)
+}
+
+/// 문서 경로를 해상도하고 정규화
+/// ID 또는 상대 경로를 받아서 실제 파일 경로로 변환
+fn resolve_document_path(id_or_relpath: &str, workspace_root: &Path) -> Result<PathBuf> {
+    let input_path = PathBuf::from(id_or_relpath);
+    
+    // 1. 확장자가 있으면 그대로 사용
+    let candidate_path = if input_path.extension().is_some() {
+        input_path
+    } else {
+        // 2. 확장자가 없으면 .md 추가
+        PathBuf::from(format!("{}.md", id_or_relpath))
+    };
+    
+    // 3. 여러 경로에서 파일 찾기 시도
+    let search_paths = vec![
+        // 워크스페이스 루트에서 직접
+        candidate_path.clone(),
+        // documents/ 디렉터리에서
+        PathBuf::from("documents").join(&candidate_path),
+        // 대소문자 변환 시도 (ID가 대문자로 변환되는 경우가 있음)
+        PathBuf::from(id_or_relpath.to_lowercase()).with_extension("md"),
+        PathBuf::from("documents").join(
+            PathBuf::from(id_or_relpath.to_lowercase()).with_extension("md")
+        ),
+    ];
+    
+    for search_path in search_paths {
+        let full_path = workspace_root.join(&search_path);
+        if full_path.exists() && full_path.is_file() {
+            // 워크스페이스 루트를 기준으로 한 상대 경로 반환
+            return Ok(search_path);
+        }
+    }
+    
+    // 4. 파일을 찾지 못한 경우 원본 경로 반환 (에러는 상위에서 처리)
+    Ok(candidate_path)
+}
 
 pub async fn read_document(id_or_relpath: String) -> Result<DocReadResult> {
     let root = resolve_workspace_root().await?;
     let storage = LocalFsStorage::new(root.clone());
-    let path = PathBuf::from(&id_or_relpath);
-    let target = if path.extension().is_some() { path } else { PathBuf::from(format!("{}.md", id_or_relpath)) };
+    
+    // 경로 정규화 및 해상도
+    let target = resolve_document_path(&id_or_relpath, &root)?;
+    
     let parser = crate::doc::parse::DocumentParser::new();
     let (doc, body) = parser.parse_file_with_body(&storage, &target)?;
     // P1: Render HTML on Rust-side for security & determinism when enabled.
@@ -168,7 +316,12 @@ pub async fn read_document(id_or_relpath: String) -> Result<DocReadResult> {
     #[cfg(not(feature = "ui_render_rust"))]
     let html = html_escape::encode_text(&body).to_string();
     let raw_markdown = std::fs::read_to_string(root.join(&target)).map_err(ContextError::Io)?;
-    Ok(DocReadResult { frontmatter: doc.clone(), sections: doc.sections.clone(), html, raw_markdown })
+    Ok(DocReadResult {
+        frontmatter: doc.clone(),
+        sections: doc.sections.clone(),
+        html,
+        raw_markdown,
+    })
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -181,21 +334,34 @@ pub async fn update_document(id_or_relpath: String, payload: UpdatePayload) -> R
     let root = resolve_workspace_root().await?;
     let _storage = LocalFsStorage::new(root.clone());
     let path = PathBuf::from(&id_or_relpath);
-    let target = if path.extension().is_some() { root.join(path) } else { root.join(format!("{}.md", id_or_relpath)) };
+    let target = if path.extension().is_some() {
+        root.join(path)
+    } else {
+        root.join(format!("{}.md", id_or_relpath))
+    };
     let orig = std::fs::read_to_string(&target).map_err(ContextError::Io)?;
     let next = match payload {
         UpdatePayload::Full { content } => content,
         UpdatePayload::Patch { find, replace } => orig.replace(&find, &replace),
     };
     atomic_write(&target, next.as_bytes())?;
-    Ok(SaveResult { ok: true, updated: true, message: None })
+    Ok(SaveResult {
+        ok: true,
+        updated: true,
+        message: None,
+    })
 }
 
 fn atomic_write(path: &Path, data: &[u8]) -> Result<()> {
     use std::fs::{self, File};
     use std::io::Write;
-    let parent = path.parent().ok_or_else(|| ContextError::ConfigError("invalid path".into()))?;
-    let tmp = parent.join(format!(".{}.tmp", path.file_name().and_then(|s| s.to_str()).unwrap_or("file")));
+    let parent = path
+        .parent()
+        .ok_or_else(|| ContextError::ConfigError("invalid path".into()))?;
+    let tmp = parent.join(format!(
+        ".{}.tmp",
+        path.file_name().and_then(|s| s.to_str()).unwrap_or("file")
+    ));
     {
         let mut f = File::create(&tmp).map_err(ContextError::Io)?;
         f.write_all(data).map_err(ContextError::Io)?;
@@ -206,16 +372,20 @@ fn atomic_write(path: &Path, data: &[u8]) -> Result<()> {
 }
 
 pub async fn read_ontology() -> Result<String> {
-    let root = resolve_workspace_root().await?;
-    let path = root.join("knowledge/ontology.yaml");
-    std::fs::read_to_string(path).map_err(ContextError::Io)
+    // NOTE: This is a core app resource, not a workspace file.
+    const ONTOLOGY_CONTENT: &str = include_str!("../../knowledge/ontology.yaml");
+    Ok(ONTOLOGY_CONTENT.to_string())
 }
 
 pub async fn update_ontology(content: String) -> Result<SaveResult> {
     let root = resolve_workspace_root().await?;
     let path = root.join("knowledge/ontology.yaml");
     atomic_write(&path, content.as_bytes())?;
-    Ok(SaveResult { ok: true, updated: true, message: None })
+    Ok(SaveResult {
+        ok: true,
+        updated: true,
+        message: None,
+    })
 }
 
 pub async fn read_rules() -> Result<String> {
@@ -228,7 +398,11 @@ pub async fn update_rules(content: String) -> Result<SaveResult> {
     let root = resolve_workspace_root().await?;
     let path = root.join("knowledge/rules.yaml");
     atomic_write(&path, content.as_bytes())?;
-    Ok(SaveResult { ok: true, updated: true, message: None })
+    Ok(SaveResult {
+        ok: true,
+        updated: true,
+        message: None,
+    })
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
@@ -248,10 +422,18 @@ pub async fn get_settings() -> Result<Settings> {
 pub async fn set_settings(_partial: Settings) -> Result<Settings> {
     // Merge partial with existing, validate watch_paths scope, then persist
     let mut current = load_ui_settings().await.unwrap_or_default();
-    if let Some(v) = _partial.theme { current.theme = Some(v); }
-    if let Some(v) = _partial.auto_reindex { current.auto_reindex = Some(v); }
-    if let Some(v) = _partial.default_budget { current.default_budget = Some(v); }
-    if let Some(v) = _partial.default_lambda { current.default_lambda = Some(v); }
+    if let Some(v) = _partial.theme {
+        current.theme = Some(v);
+    }
+    if let Some(v) = _partial.auto_reindex {
+        current.auto_reindex = Some(v);
+    }
+    if let Some(v) = _partial.default_budget {
+        current.default_budget = Some(v);
+    }
+    if let Some(v) = _partial.default_lambda {
+        current.default_lambda = Some(v);
+    }
     if let Some(paths) = _partial.watch_paths {
         validate_watch_paths(&paths).await?;
         current.watch_paths = Some(normalize_paths(paths).await?);
@@ -261,7 +443,9 @@ pub async fn set_settings(_partial: Settings) -> Result<Settings> {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ClassifyInput { pub text: String }
+pub struct ClassifyInput {
+    pub text: String,
+}
 
 pub async fn classify(input: ClassifyInput) -> Result<Vec<String>> {
     services::classify_text(&input.text)
@@ -269,8 +453,12 @@ pub async fn classify(input: ClassifyInput) -> Result<Vec<String>> {
 
 pub async fn compose(req: ComposeRequest) -> Result<PromptBundle> {
     let mut input = crate::domain::types::ComposeInput::new(req.query);
-    if let Some(b) = req.budget { input = input.with_max_tokens(b); }
-    if let Some(sections) = req.sections { let _ = sections; /* reserved for P2 */ }
+    if let Some(b) = req.budget {
+        input = input.with_max_tokens(b);
+    }
+    if let Some(sections) = req.sections {
+        let _ = sections; /* reserved for P2 */
+    }
     services::compose_prompt(input)
 }
 
@@ -283,7 +471,9 @@ async fn settings_path() -> Result<std::path::PathBuf> {
 
 async fn load_ui_settings() -> Result<Settings> {
     let p = settings_path().await?;
-    if !p.exists() { return Ok(Settings::default()); }
+    if !p.exists() {
+        return Ok(Settings::default());
+    }
     let s = std::fs::read_to_string(&p).map_err(ContextError::Io)?;
     let cfg: Settings = serde_json::from_str(&s).map_err(ContextError::JsonError)?;
     Ok(cfg)
@@ -300,13 +490,23 @@ async fn validate_watch_paths(paths: &Vec<String>) -> Result<()> {
     for p in paths {
         let pb = std::path::PathBuf::from(p);
         if !pb.exists() || !pb.is_dir() {
-            return Err(ContextError::ConfigError(format!("invalid watch path: {}", p)));
+            return Err(ContextError::ConfigError(format!(
+                "invalid watch path: {}",
+                p
+            )));
         }
-        let abs = if pb.is_absolute() { pb.clone() } else { root.join(&pb) };
+        let abs = if pb.is_absolute() {
+            pb.clone()
+        } else {
+            root.join(&pb)
+        };
         let abs = std::fs::canonicalize(&abs).map_err(ContextError::Io)?;
         let root_abs = std::fs::canonicalize(&root).map_err(ContextError::Io)?;
         if !abs.starts_with(&root_abs) {
-            return Err(ContextError::ConfigError(format!("watch path must be under workspace root: {}", abs.display())));
+            return Err(ContextError::ConfigError(format!(
+                "watch path must be under workspace root: {}",
+                abs.display()
+            )));
         }
     }
     Ok(())
