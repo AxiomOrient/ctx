@@ -2,79 +2,102 @@
 
 Research snapshot: **2026-10-04**.
 
-The deterministic core does not require a model. This document selects candidates for a later semantic candidate-selection layer.
+The deterministic core has **no model dependency and no default model**. A model is an optional semantic candidate-selection layer and must earn its place on a frozen ctx-specific evaluation set.
 
-## Decision
+## Current recommendation
 
-### Default small candidate: Kev-0.8B v1.0
+Benchmark three small candidates first. Do not choose from headline scores alone because their training data, language coverage and evaluation suites differ.
 
-Use `jaredpalmer/kev-0.8b` as the first benchmark target.
+### 1. Korean-first candidate: Laya multilingual (322M)
+
+Use `laya-multilingual` as the smallest first benchmark for Korean workspaces.
 
 Why:
 
-- Qwen3.5-0.8B base with a typed-decision pointer head; no autoregressive answer generation.
+- mmBERT-base, 322M parameters.
+- Explicitly supports 100+ languages including Korean.
+- Default 1,024-token context; the implementation supports up to 8,192 with `max_len=8192`.
+- Single-forward typed `choice`, `score`, and `noul` decisions; no text generation.
+- Current public MASSIVE results report Korean intent accuracy 0.450 for the multilingual checkpoint versus 0.110 for the English checkpoint.
+
+Limits:
+
+- Those results do not prove ctx ontology/retrieval quality.
+- Published calibration remains task dependent; fit and verify temperature on the ctx evaluation set before using confidence thresholds.
+- The generic multilingual checkpoint is not a replacement for the separately fine-tuned typed-decisions checkpoint on that benchmark.
+- Long-document results become variable beyond roughly 4k tokens in the project's own small benchmark, so long documents still need ctx-specific measurement.
+
+### 2. Apple-Silicon ultra-light candidate: TinyJev-0.6B
+
+Benchmark `AnkitAI/TinyJev-0.6B` when local memory, startup and MLX deployment matter most.
+
+Why:
+
+- 596M parameters, about 1.2 GB at fp16.
+- Native MLX path on Apple Silicon and PyTorch elsewhere.
+- Fully offline after the initial download.
+- System One-compatible typed decisions without autoregressive generation.
+- The project supports 8-bit load-time quantization on Apple Silicon; its authors report roughly half the memory and no score loss on their held-out set.
+
+Limits:
+
+- Project benchmarks are not directly comparable with Laya or Kev suites.
+- Korean documentation exists, but Korean ctx accuracy is still **unverified**.
+
+### 3. English/document candidate: Kev-0.8B v1.0
+
+Benchmark `jaredpalmer/kev-0.8b@v1.0` when document decisions and a longer validated context matter more than the smallest footprint.
+
+Why:
+
+- Qwen3.5-0.8B-Base plus LoRA adapter and pointer head.
 - Apache-2.0 model/base licensing.
-- TypeSafe-compatible `/v1/systemone` serving contract.
-- Runs on Apple Silicon.
-- Kev v1.0 pins the 0.8B release and validates an 8,192-token context.
-- The current model card reports 0.851 accuracy on a locked real-document test (936 questions), and 0.697 on its current out-of-domain test row. These are project-reported numbers, not ctx-specific evidence.
+- One-prefill typed decision architecture; no generated answer text.
+- Kev 1.0 validates 8,192-token context for the 0.8B model.
+- Current project results report 0.851 on its held-out real-document test and 0.697 on its locked out-of-domain transfer test.
 
-Important: the published model card is English-focused. **Korean quality is unverified for ctx and must not be assumed.**
+Limits:
 
-### Ultra-light comparison: TinyJev-0.6B
+- The model card explicitly lists **English** as the language. Korean quality is **unverified** and must not be inferred from the Qwen backbone.
+- The reported real-document set is partly in a trained family; the locked transfer row is the better indication of transfer, but neither is a ctx benchmark.
 
-Benchmark `AnkitAI/TinyJev-0.6B` when memory/latency dominate.
+## Escalation candidates
 
-- 596M parameters, about 1.2 GB fp16.
-- MLX on Apple Silicon.
-- Project-reported 85 ms/case on a base M1 and 88.0% on its OD-500 benchmark.
-- MIT licensed.
+### Kev-4B
 
-Its published benchmark is not directly comparable with Kev's test suites, so it is a comparison candidate, not the default on headline accuracy alone.
+Use only if the small models fail the frozen ctx accuracy/recall gate and the additional memory is justified. Kev 1.0 reports materially stronger results than 0.8B across its current transfer and document suites.
 
-### Accuracy escalation: Kev-4B
+### AnyJev L2
 
-Use only when the small model fails the ctx evaluation set.
+Use when ctx stabilizes into a small set of repeated typed questions and labelled examples accumulate.
 
-Kev's current release reports materially stronger new-source accuracy than 0.8B, at a much larger memory cost. The architecture should allow an endpoint swap without changing graph semantics.
+AnyJev's current L2 method fits a closed-form head per question from roughly 100-300 labels, reads hidden state around two thirds of model depth, and does not change backbone weights. That is attractive for a stable high-volume classifier, but it is not the simplest starting point for an open-ended ontology workspace and the head does not transfer to a different question.
 
-## Why Laya is not the default
+## Product rule
 
-Laya remains useful, especially `laya-multilingual` for 100+ languages and the 421M typed-decisions checkpoint for its trained workflows. But current published evidence shows an important distinction:
+Do **not** hard-code any of these models into graph truth.
 
-- `laya-typed-decisions` is strong on the four workflows it was fine-tuned for.
-- the general and multilingual checkpoints perform much worse on that typed-decisions benchmark.
+A future model adapter may only:
 
-That makes "Laya is smaller, therefore use it for every semantic decision" an invalid default. For Korean workspaces, `laya-multilingual` should be measured against Kev/TinyJev and a simple lexical baseline on the actual ctx evaluation set.
-
-## Why AnyJev is not the default
-
-AnyJev is strategically useful because it can turn Qwen models into Jev-style decision systems and its L2 readout can become strong with per-question labels. But L2 requires roughly 100-300 labels per question family and shipped heads are model/question specific. That is excellent for stable high-volume classifiers, not the simplest starting point for an open-ended ontology workspace.
-
-## Integration boundary
-
-A future model adapter may do only these tasks:
-
-- choose likely entities from an explicit candidate list,
-- choose likely relations from an explicit candidate list,
+- shortlist likely entities from explicit candidates,
+- shortlist likely relations from explicit candidates,
 - rank candidate evidence blocks,
-- decide whether retrieval is sufficient enough to stop searching.
+- decide whether semantic retrieval should continue.
 
 It may not:
 
-- create authoritative entities or edges silently,
-- mark evidence valid,
-- resolve stale digests,
-- override domain/range or cycle checks,
-- convert missing evidence into `true`,
+- silently create authoritative entities or edges,
+- validate evidence freshness,
+- override relation domain/range or cycle checks,
+- convert missing evidence into success,
 - authorize an action.
 
-The expected flow is:
+The flow remains:
 
 ```text
 query
-  -> deterministic exact lookup first
-  -> local decision model only if ambiguity remains
+  -> exact graph/source lookup first
+  -> optional local decision model if ambiguity remains
   -> candidate evidence
   -> deterministic source verification
   -> explicit topology assertion
@@ -82,21 +105,31 @@ query
 
 ## Promotion test
 
-Before any model becomes a product default, freeze a ctx-specific set containing Korean and English cases with:
+Freeze a bilingual Korean/English ctx evaluation set before selecting a product model. Each case records:
 
 - expected entity,
 - expected relation,
-- expected source file,
-- expected line range,
-- and expected `valid / violated / unknown` result.
+- expected source,
+- expected exact line range,
+- expected `valid / violated / unknown`,
+- and whether semantic model invocation was actually necessary.
 
-Measure candidate-selection recall, confidence calibration, latency and memory separately. Model confidence is never evidence truth.
+Measure separately:
 
-## Current research sources
+- candidate recall,
+- evidence/anchor precision,
+- unsupported-assertion rate,
+- calibration (ECE/Brier where probabilities are used),
+- p50/p95 latency,
+- peak memory,
+- cold-start cost.
 
-- Kev v1.0 release and model cards: <https://github.com/jaredpalmer/kev>
+Model confidence is never evidence truth.
+
+## Current sources
+
+- Laya: <https://github.com/NandhaKishorM/laya>
+- Kev v1.0: <https://github.com/jaredpalmer/kev>
 - Kev-0.8B: <https://huggingface.co/jaredpalmer/kev-0.8b>
 - TinyJev: <https://github.com/ankit-aglawe/tinyjev>
-- Laya: <https://github.com/NandhaKishorM/laya>
 - AnyJev: <https://github.com/nokia-applied-research/AnyJev>
-- JevBench: <https://github.com/fstandhartinger/jevbench>
