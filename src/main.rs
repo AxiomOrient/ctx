@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 use ctx::{
-    EvidenceState, CtxError, Result, impact, inspect_evidence, load_ontology, load_topology,
+    CtxError, EvidenceState, Result, inspect_evidence, load_ontology, load_topology,
     neighborhood, pin_topology, shortest_path, validate_workspace,
 };
 use serde::Serialize;
@@ -37,8 +37,6 @@ enum Command {
         #[arg(long, default_value_t = 1)]
         depth: usize,
     },
-    /// Show reverse dependency impact: what can be affected by this entity.
-    Impact { id: String },
     /// Find a directed path. Symmetric relations work in both directions.
     Path { from: String, to: String },
 }
@@ -65,8 +63,8 @@ fn main() {
 fn run() -> Result<()> {
     let cli = Cli::parse();
     let workspace = cli.workspace.canonicalize()?;
-    let ontology_path = resolve(&workspace, &cli.ontology);
-    let topology_path = resolve(&workspace, &cli.topology);
+    let ontology_path = resolve_inside(&workspace, &cli.ontology)?;
+    let topology_path = resolve_inside(&workspace, &cli.topology)?;
 
     match cli.command {
         Command::Pin => {
@@ -130,19 +128,6 @@ fn run() -> Result<()> {
                     }
                     Ok(())
                 }
-                Command::Impact { id } => {
-                    let affected = impact(&topology, &id)?;
-                    if cli.json {
-                        print_json(&affected)?;
-                    } else if affected.is_empty() {
-                        println!("no reverse dependents");
-                    } else {
-                        for item in affected {
-                            println!("{item}");
-                        }
-                    }
-                    Ok(())
-                }
                 Command::Path { from, to } => {
                     let path = shortest_path(&ontology, &topology, &from, &to)?;
                     if cli.json {
@@ -172,12 +157,20 @@ fn run() -> Result<()> {
     }
 }
 
-fn resolve(workspace: &Path, path: &Path) -> PathBuf {
-    if path.is_absolute() {
+fn resolve_inside(workspace: &Path, path: &Path) -> Result<PathBuf> {
+    let joined = if path.is_absolute() {
         path.to_path_buf()
     } else {
         workspace.join(path)
+    };
+    let canonical = joined.canonicalize()?;
+    if !canonical.starts_with(workspace) {
+        return Err(CtxError(format!(
+            "configuration path escapes workspace: {}",
+            path.display()
+        )));
     }
+    Ok(canonical)
 }
 
 fn print_json<T: Serialize>(value: &T) -> Result<()> {

@@ -1,6 +1,5 @@
 use ctx::{
-    Edge, Entity, Ontology, RelationSpec, Topology, TypeSpec, impact, shortest_path,
-    validate_workspace,
+    Edge, Entity, Ontology, RelationSpec, Topology, TypeSpec, shortest_path, validate_workspace,
 };
 use std::collections::BTreeMap;
 
@@ -59,12 +58,6 @@ fn path_follows_relation_direction() {
     assert!(shortest_path(&ontology, &topology, "privacy", "release")
         .unwrap()
         .is_none());
-}
-
-#[test]
-fn impact_is_reverse_transitive() {
-    let (_, topology) = fixture();
-    assert_eq!(impact(&topology, "privacy").unwrap(), vec!["release"]);
 }
 
 #[test]

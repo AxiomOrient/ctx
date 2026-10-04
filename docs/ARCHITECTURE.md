@@ -69,7 +69,7 @@ Direction is meaningful.
 A --requires--> B
 ```
 
-means A depends on B. `impact B` therefore follows incoming edges to A and then further incoming edges.
+means exactly what the ontology says `requires` means. Core traversal does not infer a generic "impact" semantics from arbitrary relations.
 
 A relation may be declared symmetric. Symmetry changes traversal semantics; it does not require a duplicated reverse edge.
 

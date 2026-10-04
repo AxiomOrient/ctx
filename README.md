@@ -33,7 +33,6 @@ No generated index is authoritative.
 ctx --workspace ./workspace check
 ctx --workspace ./workspace pin
 ctx --workspace ./workspace explain step.release --depth 2
-ctx --workspace ./workspace impact artifact.privacy
 ctx --workspace ./workspace path step.release requirement.reviewed
 ```
 
@@ -64,10 +63,6 @@ A digest covers the cited evidence, not the whole file. Unrelated edits elsewher
 ### `explain`
 
 Shows nearby entities and relations plus exact evidence snippets. The explanation is reconstructed from files every time; no model output is treated as truth.
-
-### `impact`
-
-Walks incoming relations transitively to answer "what can be affected if this entity changes?"
 
 ### `path`
 

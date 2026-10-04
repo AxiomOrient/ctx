@@ -6,6 +6,6 @@ pub mod validate;
 
 pub use domain::*;
 pub use evidence::{inspect_evidence, pin_topology};
-pub use graph::{impact, neighborhood, shortest_path};
+pub use graph::{neighborhood, shortest_path};
 pub use load::{load_ontology, load_topology};
 pub use validate::validate_workspace;

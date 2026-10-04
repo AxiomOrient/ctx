@@ -24,8 +24,8 @@ pub fn neighborhood(
             continue;
         }
         for next in adjacent_all(topology, &current) {
-            if !distance.contains_key(&next) {
-                distance.insert(next.clone(), current_depth + 1);
+            if let std::collections::btree_map::Entry::Vacant(entry) = distance.entry(next.clone()) {
+                entry.insert(current_depth + 1);
                 queue.push_back(next);
             }
         }
@@ -57,36 +57,6 @@ pub fn neighborhood(
         entities: output_entities,
         connections,
     })
-}
-
-pub fn impact(topology: &Topology, root: &str) -> Result<Vec<String>> {
-    let entities = entity_map(topology);
-    if !entities.contains_key(root) {
-        return Err(CtxError(format!("unknown entity '{root}'")));
-    }
-
-    let mut seen = BTreeSet::from([root.to_string()]);
-    let mut queue = VecDeque::from([root.to_string()]);
-    let mut result = Vec::new();
-
-    while let Some(current) = queue.pop_front() {
-        let mut incoming: Vec<String> = topology
-            .edges
-            .iter()
-            .filter(|edge| edge.to == current)
-            .map(|edge| edge.from.clone())
-            .collect();
-        incoming.sort();
-        incoming.dedup();
-
-        for next in incoming {
-            if seen.insert(next.clone()) {
-                result.push(next.clone());
-                queue.push_back(next);
-            }
-        }
-    }
-    Ok(result)
 }
 
 pub fn shortest_path(
