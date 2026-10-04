@@ -315,7 +315,7 @@ pub async fn read_document(id_or_relpath: String) -> Result<DocReadResult> {
     let html = crate::app::ui::render::render_markdown_to_safe_html(&body);
     #[cfg(not(feature = "ui_render_rust"))]
     let html = html_escape::encode_text(&body).to_string();
-    let raw_markdown = std::fs::read_to_string(root.join(&target)).map_err(ContextError::Io)?;
+    let raw_markdown = storage.read(&target)?;
     Ok(DocReadResult {
         frontmatter: doc.clone(),
         sections: doc.sections.clone(),
@@ -332,13 +332,22 @@ pub enum UpdatePayload {
 
 pub async fn update_document(id_or_relpath: String, payload: UpdatePayload) -> Result<SaveResult> {
     let root = resolve_workspace_root().await?;
-    let _storage = LocalFsStorage::new(root.clone());
-    let path = PathBuf::from(&id_or_relpath);
-    let target = if path.extension().is_some() {
-        root.join(path)
+    update_document_at_root(&root, &id_or_relpath, payload)
+}
+
+fn update_document_at_root(
+    root: &Path,
+    id_or_relpath: &str,
+    payload: UpdatePayload,
+) -> Result<SaveResult> {
+    let storage = LocalFsStorage::new(root);
+    let path = PathBuf::from(id_or_relpath);
+    let relative_or_absolute = if path.extension().is_some() {
+        path
     } else {
-        root.join(format!("{}.md", id_or_relpath))
+        PathBuf::from(format!("{}.md", id_or_relpath))
     };
+    let target = storage.resolve_path(&relative_or_absolute)?;
     let orig = std::fs::read_to_string(&target).map_err(ContextError::Io)?;
     let next = match payload {
         UpdatePayload::Full { content } => content,
@@ -353,21 +362,36 @@ pub async fn update_document(id_or_relpath: String, payload: UpdatePayload) -> R
 }
 
 fn atomic_write(path: &Path, data: &[u8]) -> Result<()> {
-    use std::fs::{self, File};
     use std::io::Write;
     let parent = path
         .parent()
         .ok_or_else(|| ContextError::ConfigError("invalid path".into()))?;
-    let tmp = parent.join(format!(
-        ".{}.tmp",
-        path.file_name().and_then(|s| s.to_str()).unwrap_or("file")
-    ));
-    {
-        let mut f = File::create(&tmp).map_err(ContextError::Io)?;
-        f.write_all(data).map_err(ContextError::Io)?;
-        f.sync_all().map_err(ContextError::Io)?;
+    let permissions = match std::fs::metadata(path) {
+        Ok(metadata) => Some(metadata.permissions()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => return Err(ContextError::Io(error)),
+    };
+    // Exclusive creation prevents planted-temp-file symlinks. OpenOptions retains
+    // File::create's platform defaults (0666 & umask on Unix) for new targets.
+    let mut temporary = tempfile::Builder::new()
+        .make_in(parent, |temporary_path| {
+            std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(temporary_path)
+        })
+        .map_err(ContextError::Io)?;
+    if let Some(permissions) = permissions {
+        temporary
+            .as_file()
+            .set_permissions(permissions)
+            .map_err(ContextError::Io)?;
     }
-    fs::rename(&tmp, path).map_err(ContextError::Io)?;
+    temporary.write_all(data).map_err(ContextError::Io)?;
+    temporary.as_file().sync_all().map_err(ContextError::Io)?;
+    temporary
+        .persist(path)
+        .map_err(|error| ContextError::Io(error.error))?;
     Ok(())
 }
 
@@ -524,4 +548,128 @@ async fn normalize_paths(paths: Vec<String>) -> Result<Vec<String>> {
     out.sort();
     out.dedup();
     Ok(out)
+}
+
+
+#[cfg(test)]
+mod document_write_tests {
+    use super::{atomic_write, update_document_at_root, UpdatePayload};
+    use crate::domain::errors::Result;
+    use std::fs;
+
+    #[test]
+    fn updates_documents_but_rejects_absolute_and_relative_escapes() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let root = temp.path().join("workspace");
+        fs::create_dir(&root)?;
+        let outside = temp.path().join("outside.md");
+        fs::write(&outside, "outside original")?;
+        fs::write(root.join("document.md"), "before")?;
+        for input in [
+            outside.to_string_lossy().into_owned(),
+            "../outside.md".to_string(),
+        ] {
+            assert!(update_document_at_root(
+                &root,
+                &input,
+                UpdatePayload::Full {
+                    content: "changed".into()
+                }
+            )
+            .is_err());
+        }
+        update_document_at_root(
+            &root,
+            "document",
+            UpdatePayload::Full {
+                content: "after".into(),
+            },
+        )?;
+        update_document_at_root(
+            &root,
+            "document.md",
+            UpdatePayload::Patch {
+                find: "after".into(),
+                replace: "patched".into(),
+            },
+        )?;
+        assert_eq!(fs::read_to_string(root.join("document.md"))?, "patched");
+        assert_eq!(fs::read_to_string(&outside)?, "outside original");
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn update_rejects_outside_leaf_symlink() -> Result<()> {
+        use std::os::unix::fs::symlink;
+        let temp = tempfile::tempdir()?;
+        let root = temp.path().join("workspace");
+        fs::create_dir(&root)?;
+        let outside = temp.path().join("outside.md");
+        fs::write(&outside, "unchanged")?;
+        symlink(&outside, root.join("document.md"))?;
+        assert!(update_document_at_root(
+            &root,
+            "document.md",
+            UpdatePayload::Full {
+                content: "changed".into()
+            }
+        )
+        .is_err());
+        assert_eq!(fs::read_to_string(&outside)?, "unchanged");
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn atomic_save_ignores_preexisting_predictable_temp_symlink() -> Result<()> {
+        use std::os::unix::fs::symlink;
+        let temp = tempfile::tempdir()?;
+        let target = temp.path().join("document.md");
+        let outside = temp.path().join("unrelated.md");
+        fs::write(&target, "before")?;
+        fs::write(&outside, "unchanged")?;
+        let malicious_temp = temp.path().join(".document.md.tmp");
+        symlink(&outside, &malicious_temp)?;
+        atomic_write(&target, b"after")?;
+        assert_eq!(fs::read_to_string(&target)?, "after");
+        assert_eq!(fs::read_to_string(&outside)?, "unchanged");
+        assert!(fs::symlink_metadata(&malicious_temp)?
+            .file_type()
+            .is_symlink());
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn atomic_save_preserves_existing_file_permissions() -> Result<()> {
+        use std::os::unix::fs::PermissionsExt;
+        let temp = tempfile::tempdir()?;
+        let target = temp.path().join("shared.md");
+        for mode in [0o644, 0o600, 0o660] {
+            fs::write(&target, "before")?;
+            fs::set_permissions(&target, fs::Permissions::from_mode(mode))?;
+            atomic_write(&target, b"after")?;
+            assert_eq!(fs::metadata(&target)?.permissions().mode() & 0o777, mode);
+            assert_eq!(fs::read_to_string(&target)?, "after");
+        }
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn new_atomic_file_uses_the_normal_creation_mode() -> Result<()> {
+        use std::os::unix::fs::PermissionsExt;
+        let temp = tempfile::tempdir()?;
+        let ordinary = temp.path().join("ordinary.json");
+        let atomic = temp.path().join("settings.json");
+        // Compare under the same inherited umask without changing process-global state.
+        fs::write(&ordinary, "{}")?;
+        atomic_write(&atomic, b"{}")?;
+        assert_eq!(
+            fs::metadata(&atomic)?.permissions().mode() & 0o777,
+            fs::metadata(&ordinary)?.permissions().mode() & 0o777
+        );
+        Ok(())
+    }
 }
