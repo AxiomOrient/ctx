@@ -1,0 +1,27 @@
+version: 1
+
+types:
+  Step:
+    description: A process step.
+  Artifact:
+    description: A concrete document or output.
+  Requirement:
+    description: A condition that must be satisfied.
+
+relations:
+  requires:
+    description: The source cannot complete without the target.
+    from: [Step]
+    to: [Artifact, Requirement]
+    acyclic: true
+
+  supports:
+    description: The source provides evidence for the target.
+    from: [Artifact]
+    to: [Requirement]
+
+  related:
+    description: A non-directional semantic connection.
+    from: ["*"]
+    to: ["*"]
+    symmetric: true

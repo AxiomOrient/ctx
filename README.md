@@ -1,65 +1,112 @@
-# ctx — FS-First, Markdown-Centric Context Composer
+# ctx
 
-[![Rust](https://github.com/axient/ctx/actions/workflows/rust.yml/badge.svg)](https://github.com/axient/ctx/actions/workflows/rust.yml)
+`ctx` is a small deterministic evidence graph for local ontologies and topologies.
 
-ctx는 파일시스템(문서·온톨로지·룰) 기반으로 안정적이고 결정론적인 프롬프트 컨텍스트를 생성합니다. 분류(ontology/rules) → 후보 검색/점수화 → MMR 선택 → 예산 컷 → 템플릿 합성을 단일 바이너리에서 제공합니다.
+It answers three questions without a model:
 
-**모드**
-- CLI: 로컬 파이프라인/도구 실행
-- MCP: rmcp SDK 기반 stdio 서버 (단일 경로)
-- UI(Tauri + Svelte 5): 문서 뷰어/Prompt 패널/지식/설정 (feature-gated)
+1. **What is connected?** -- typed entities and relations.
+2. **What is wrong?** -- schema, reference, cycle and evidence validation with witnesses.
+3. **Where is the proof?** -- every asserted relation can point to an exact source slice and pinned digest.
 
-**핵심 원칙**
-- FS-First: 문서/온톨로지/룰은 파일로 관리, Git 추적 최적화
-- Deterministic: 동일 입력 → 동일 출력 (정렬/중복/예산 엄격)
-- Secure-by-default: 서버측 렌더링 + sanitizer, 원자 저장(tmp→fsync→rename), 워크스페이스 스코프
+This is a clean break from the previous context-composer implementation. There is no compatibility layer, UI, HTTP server, prompt pipeline, MMR, legacy schema, or database.
 
-## Install / Run
+Copyright (c) Axient Inc. All rights reserved.
 
-- Build: `cargo build` (release: `cargo build --release`)
-- Run (CLI): `cargo run -- <command> [...args]`
-- Run (MCP): `cargo run -- mcp`
-- Run (UI dev):
-  - Frontend: `cd apps/ui && npm i && npm run dev`
-  - Tauri window: `cargo run --features ui_tauri,ui_ipc,ui_render_rust -- ui`
+## Canonical data
 
-## CLI Commands (subset)
-- `parse <file> --format yaml|json`
-- `classify <file> --format human|json|yaml`
-- `import <input> [--contexts-dir <dir>] [--interactive]`
-- `index --path <dir> --db <file> [--ontology <file>] [--rules <file>]`
-- `validate <file> --format human|json|yaml`
-- `server --port 3000 --host 127.0.0.1` (feature=http)
-- `mcp` (rmcp SDK stdio server)
+A workspace has only three authoritative inputs:
 
-## UI (P1)
-- 레이아웃: 좌 Documents / 중앙 Viewer / 우 Prompt(기본) 또는 Ontology/Rules(토글)
-- 상태: SSOT(Single Source Of Truth) `apps/ui/src/lib/ssot.ts`
-- 단축키: ⌘/Ctrl+Enter Generate, P 패널 전환, E 편집 토글, J JSON 메타, ⌘/Ctrl+O 폴더 변경
-- IPC: `select_workspace`, `list_documents`, `read_document`, `update_document`, `compose`, `read_ontology/update_ontology`, `read_rules/update_rules`, `get_settings/set_settings`
-- 렌더링(feature=ui_render_rust): comrak + syntect + ammonia → 안전한 HTML만 WebView로 전달
+```text
+workspace/
+|-- ontology.yaml   # type and relation contract
+|-- topology.yaml   # concrete entities, relations, evidence pointers
+`-- ...             # source files referenced by evidence
+```
 
-## Features
-- `mcp_sdk` (default): rmcp 기반 MCP 서버
-- `http`: 경량 HTTP 모드
-- `ui_ipc`: UI IPC 백엔드
-- `ui_render_rust`: 서버측 Markdown→HTML 렌더 + Sanitizer
-- `ui_tauri`: Tauri 창/커맨드 바인딩 (UI 실행)
+`ontology.yaml` defines **what may exist**. `topology.yaml` defines **what does exist**. Source files remain the evidence.
 
-## Testing / Golden
-- Compose goldens: `UPDATE_GOLDEN=1 cargo test -q --test compose_golden`
-- MCP schema goldens: `UPDATE_GOLDEN=1 cargo test -q --test mcp_schema`
-- UI renderer goldens: `UPDATE_GOLDEN=1 cargo test -q --test ui_render_golden --features ui_render_rust`
-- Lint/format: `cargo fmt --check`, `cargo clippy -D warnings`
+No generated index is authoritative.
 
-## Security / Determinism
-- 경로 정규화·워크스페이스 스코프, 허용 확장자/크기 제한(구성), 원자 저장 루틴 준수
-- 서버측 렌더링 + sanitizer(허용 태그/클래스 최소화), 상대 URL 차단
-- 동일 입력 → 동일 출력, 시계/랜덤 의존 제거
+## Commands
 
-## File Structure
-- 최신 구조는 `docs/FILE_STRUCTURE.md` 참조
+```bash
+ctx --workspace ./workspace check
+ctx --workspace ./workspace pin
+ctx --workspace ./workspace explain step.release --depth 2
+ctx --workspace ./workspace impact artifact.privacy
+ctx --workspace ./workspace path step.release requirement.reviewed
+```
 
-## Contributing
-- PR 전: `cargo test`, `cargo clippy -D warnings`, `cargo fmt --all`
-- CLI/IPC/스키마 변경 시 README와 `docs/`를 갱신하세요
+Add `--json` for machine-readable output.
+
+### `check`
+
+Validates:
+
+- schema version
+- entity type existence
+- relation existence
+- relation domain/range
+- duplicate IDs and duplicate assertions
+- acyclic relation cycles with a concrete witness path
+- evidence path containment
+- evidence line ranges
+- evidence digest freshness
+
+Missing information is never converted into success. Unpinned evidence is a warning; stale or invalid evidence is an error.
+
+### `pin`
+
+Computes SHA-256 over each cited line slice and writes the digest into `topology.yaml`. `pin` rewrites that file in canonical YAML form.
+
+A digest covers the cited evidence, not the whole file. Unrelated edits elsewhere do not invalidate a relation. If lines move or cited text changes, validation reports the evidence as stale.
+
+### `explain`
+
+Shows nearby entities and relations plus exact evidence snippets. The explanation is reconstructed from files every time; no model output is treated as truth.
+
+### `impact`
+
+Walks incoming relations transitively to answer "what can be affected if this entity changes?"
+
+### `path`
+
+Finds a directed relation path. Relations declared `symmetric: true` are traversable both ways.
+
+## Why there is no DB, vector index, tokenizer, AST or local model in core
+
+They are not currently required to satisfy the correctness contract. Adding them now would create extra state and failure modes without improving authoritative answers.
+
+They may be added only as derived acceleration or semantic-discovery layers after an evaluation proves a real benefit:
+
+- SQLite/FTS/BM25: when filesystem scanning or lexical candidate recall becomes a measured bottleneck.
+- Vector search: when lexical + graph candidate generation misses required evidence.
+- Markdown AST: when exact block-level anchors require syntax that the current line evidence contract cannot express.
+- PageIndex: when long documents exceed the practical decision-model context and hierarchical navigation improves evidence recall.
+- Jev-family model: for semantic candidate selection or routing only. It may propose evidence; `ctx check` remains the authority.
+
+See [`docs/MODEL_SELECTION.md`](docs/MODEL_SELECTION.md).
+
+## Example
+
+```bash
+cd examples
+cargo run --manifest-path ../Cargo.toml -- check
+cargo run --manifest-path ../Cargo.toml -- explain step.release --depth 2
+```
+
+The second edge in `examples/topology.yaml` is intentionally unpinned so `check` demonstrates the non-fatal warning. Run `pin` to make the example fully pinned.
+
+## Development
+
+Required local verification:
+
+```bash
+cargo fmt --check
+cargo test
+cargo clippy --all-targets -- -D warnings
+cargo run -- --workspace examples check
+cargo run -- --workspace examples explain step.release --depth 2
+```
+
+There is intentionally no CI configuration in this repository.

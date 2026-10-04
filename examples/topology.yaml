@@ -1,0 +1,36 @@
+version: 1
+
+entities:
+  - id: step.release
+    kind: Step
+    title: Release
+
+  - id: artifact.privacy
+    kind: Artifact
+    title: Privacy notice
+
+  - id: requirement.reviewed
+    kind: Requirement
+    title: Privacy notice reviewed
+
+edges:
+  - id: release.requires.privacy
+    from: step.release
+    relation: requires
+    to: artifact.privacy
+    evidence:
+      - path: docs/release.md
+        lines:
+          start: 3
+          end: 4
+        digest: sha256:eb054240dbf7e0a6230ad84862582afd697eadff16315ca412d94ee25587815c
+
+  - id: privacy.supports.reviewed
+    from: artifact.privacy
+    relation: supports
+    to: requirement.reviewed
+    evidence:
+      - path: docs/release.md
+        lines:
+          start: 3
+          end: 3
