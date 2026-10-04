@@ -1,7 +1,0 @@
-{
-  "query": "Compose context that violates a hypothetical rule requiring a specific section.",
-  "tags": ["rules"],
-  "max_tokens": 400,
-  "exclude_sources": null,
-  "priority_sources": null
-}

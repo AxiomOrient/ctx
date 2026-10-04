@@ -1,7 +1,0 @@
-{
-  "query": "Summarize the architecture by sections: Architecture, Design Decisions, Testing",
-  "tags": ["architecture", "testing"],
-  "max_tokens": 512,
-  "exclude_sources": null,
-  "priority_sources": null
-}

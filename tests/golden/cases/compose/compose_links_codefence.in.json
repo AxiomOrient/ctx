@@ -1,7 +1,0 @@
-{
-  "query": "Detect and preserve code fences and links within the composed context.",
-  "tags": ["parsing", "links", "code"],
-  "max_tokens": 600,
-  "exclude_sources": null,
-  "priority_sources": null
-}

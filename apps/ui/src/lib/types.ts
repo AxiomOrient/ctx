@@ -1,9 +1,0 @@
-export type WorkspaceSummary = { root: string; doc_count: number };
-export type IndexSummary = { total: number; errors: number };
-export type DocMeta = { id: string; path: string; tags: string[]; sections: number; mtime?: number };
-export type SectionDef = { id: string; name: string; marker: string; priority: number; tokens?: number };
-export type ContextDocument = { id: string; title: string; version: string; schema: string; type?: string; tags: string[]; sections: SectionDef[] };
-export type DocReadResult = { frontmatter: ContextDocument; sections: SectionDef[]; html: string; raw_markdown: string };
-export type SaveResult = { ok: boolean; updated: boolean; message?: string };
-export type ComposeRequest = { query: string; sections?: string[]; budget?: number; lambda?: number; facets?: Record<string,string[]>; template?: string };
-export type PromptBundle = { prompt: string; context: string; tokens: number; sources: string[]; confidence: number };
