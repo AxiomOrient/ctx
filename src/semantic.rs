@@ -1,10 +1,16 @@
 use crate::domain::{CtxError, Entity, GraphSnapshot, QueryMatch, QueryMatchKind, Result};
 use serde::{Deserialize, Serialize};
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
 
 pub const DECIDER_PROTOCOL_VERSION: u32 = 1;
+
+const DECIDER_TIMEOUT: Duration = Duration::from_secs(30);
+const DECIDER_MAX_STDOUT_BYTES: usize = 64 * 1024;
+const DECIDER_POLL_INTERVAL: Duration = Duration::from_millis(10);
 
 #[derive(Debug, Clone, Serialize)]
 pub struct DecisionCandidate {
@@ -101,17 +107,79 @@ pub fn select_entity_with_command(
         stdin.write_all(b"\n")?;
     }
 
-    let output = child.wait_with_output()?;
-    if !output.status.success() {
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| CtxError("decision adapter stdout is unavailable".into()))?;
+    let reader = thread::spawn(move || read_bounded(stdout, DECIDER_MAX_STDOUT_BYTES));
+
+    let deadline = Instant::now() + DECIDER_TIMEOUT;
+    let status = loop {
+        if let Some(status) = child.try_wait()? {
+            break status;
+        }
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = reader.join();
+            return Err(CtxError(format!(
+                "decision adapter '{}' timed out after {} seconds",
+                program.display(),
+                DECIDER_TIMEOUT.as_secs()
+            )));
+        }
+        thread::sleep(DECIDER_POLL_INTERVAL);
+    };
+
+    let (stdout, overflowed) = reader
+        .join()
+        .map_err(|_| CtxError("decision adapter stdout reader panicked".into()))??;
+
+    if overflowed {
         return Err(CtxError(format!(
-            "decision adapter '{}' exited with {}",
+            "decision adapter '{}' exceeded {} bytes of stdout",
             program.display(),
-            output.status
+            DECIDER_MAX_STDOUT_BYTES
         )));
     }
 
-    let response: DecisionResponse = serde_json::from_slice(&output.stdout)?;
+    if !status.success() {
+        return Err(CtxError(format!(
+            "decision adapter '{}' exited with {}",
+            program.display(),
+            status
+        )));
+    }
+
+    let response: DecisionResponse = serde_json::from_slice(&stdout)?;
     validate_response(response, candidates)
+}
+
+
+fn read_bounded<R: Read>(mut reader: R, limit: usize) -> std::io::Result<(Vec<u8>, bool)> {
+    let mut output = Vec::with_capacity(limit.min(4096));
+    let mut chunk = [0_u8; 8192];
+    let mut overflowed = false;
+
+    loop {
+        let read = reader.read(&mut chunk)?;
+        if read == 0 {
+            break;
+        }
+
+        if output.len() < limit {
+            let remaining = limit - output.len();
+            let keep = remaining.min(read);
+            output.extend_from_slice(&chunk[..keep]);
+            if keep < read {
+                overflowed = true;
+            }
+        } else {
+            overflowed = true;
+        }
+    }
+
+    Ok((output, overflowed))
 }
 
 fn validate_response(
@@ -197,6 +265,14 @@ mod tests {
         let candidates = semantic_candidates(&graph, &matches);
         assert_eq!(candidates.len(), 2);
         assert!(!candidates.iter().any(|item| item.id == "c"));
+    }
+
+    #[test]
+    fn bounded_reader_caps_memory_and_reports_overflow() {
+        let input = vec![b'x'; 32];
+        let (output, overflowed) = read_bounded(std::io::Cursor::new(input), 8).unwrap();
+        assert_eq!(output.len(), 8);
+        assert!(overflowed);
     }
 
     #[test]

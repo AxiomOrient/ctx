@@ -139,7 +139,7 @@ pub fn query_entities(graph: &GraphSnapshot, text: &str) -> Vec<QueryMatch> {
 }
 
 fn normalize_key(value: &str) -> String {
-    value.nfc().collect::<String>().to_lowercase()
+    value.trim().nfc().collect::<String>().to_lowercase()
 }
 
 fn query_rank(kind: QueryMatchKind) -> u8 {

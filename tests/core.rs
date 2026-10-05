@@ -252,3 +252,58 @@ fn query_normalizes_korean_unicode() {
         item.kind == QueryMatchKind::Alias && item.entity.aliases.iter().any(|alias| alias == "가")
     }));
 }
+
+#[test]
+fn query_trims_outer_whitespace() {
+    let temp = TempWorkspace::new();
+    temp.write("schema.yaml", schema());
+    temp.write(
+        "knowledge/release.md",
+        &release(
+            "Publishing requires privacy.",
+            "Publishing requires privacy.",
+            None,
+        ),
+    );
+    temp.write("knowledge/privacy.md", privacy());
+
+    let workspace = compile(&temp.path);
+    let matches = query_entities(&workspace.graph, "  publish  ");
+    assert_eq!(matches.len(), 1);
+    assert_eq!(matches[0].kind, QueryMatchKind::Alias);
+    assert_eq!(matches[0].entity.id, "step.release");
+}
+
+#[test]
+fn symmetric_relation_requires_matching_type_sets() {
+    let temp = TempWorkspace::new();
+    temp.write(
+        "schema.yaml",
+        r#"version: 1
+types:
+  Person: {}
+  Organization: {}
+relations:
+  linked:
+    from: [Person]
+    to: [Organization]
+    symmetric: true
+"#,
+    );
+    temp.write(
+        "knowledge/person.md",
+        "---\nid: person.a\ntype: Person\n---\n# Person\n",
+    );
+    temp.write(
+        "knowledge/org.md",
+        "---\nid: org.a\ntype: Organization\n---\n# Organization\n",
+    );
+
+    let workspace = compile(&temp.path);
+    let report = validate_workspace(&workspace.root, &workspace.schema, &workspace.graph);
+
+    assert!(report.verdicts.iter().any(|verdict| {
+        verdict.status == VerdictStatus::Violated
+            && verdict.code == "relation.symmetric_type_mismatch"
+    }));
+}

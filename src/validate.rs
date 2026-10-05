@@ -294,6 +294,23 @@ fn validate_schema(schema: &Schema, report: &mut ValidationReport) {
             );
         }
 
+        if relation.symmetric
+            && !relation.from.is_empty()
+            && !relation.to.is_empty()
+            && !same_type_set(&relation.from, &relation.to)
+        {
+            ok = false;
+            report.push(
+                VerdictStatus::Violated,
+                "relation.symmetric_type_mismatch",
+                &subject,
+                "a symmetric relation must declare the same source and target type set",
+                vec![Witness::Schema {
+                    path: format!("schema.yaml:relations.{name}"),
+                }],
+            );
+        }
+
         for type_name in relation.from.iter().chain(relation.to.iter()) {
             if type_name != "*" && !schema.types.contains_key(type_name) {
                 ok = false;
@@ -570,6 +587,11 @@ fn validate_cycles(schema: &Schema, valid_edges: &[&Edge], report: &mut Validati
 
 fn accepts(allowed: &[String], actual: &str) -> bool {
     allowed.iter().any(|value| value == "*" || value == actual)
+}
+
+fn same_type_set(left: &[String], right: &[String]) -> bool {
+    left.iter().map(String::as_str).collect::<BTreeSet<_>>()
+        == right.iter().map(String::as_str).collect::<BTreeSet<_>>()
 }
 
 fn semantic_key(edge: &Edge, symmetric: bool) -> String {

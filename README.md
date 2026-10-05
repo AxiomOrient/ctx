@@ -41,7 +41,7 @@ Only the constraints needed by the core are supported:
 - relation domain/range
 - `min` / `max`
 - `acyclic`
-- `symmetric`
+- `symmetric` — source/target type sets must be identical
 
 ```yaml
 version: 1
@@ -176,7 +176,7 @@ It must write exactly one JSON object to stdout:
 
 `entity_id` may be `null`. Confidence is optional, validated to `0..=1`, and is never treated as evidence truth. An adapter cannot select an entity outside the candidate set.
 
-Logs belong on stderr.
+Logs belong on stderr. ctx terminates a decider that exceeds 30 seconds and rejects stdout larger than 64 KiB; the protocol expects one small JSON response.
 
 This boundary is the model-switching mechanism. No model name, tokenizer, runtime, checkpoint path, or confidence threshold is part of the graph contract. A wrapper may internally use Laya-Ko, TinyJev, Kev, AnyJev, a System One server, or a future local classifier without changing ctx data or public graph semantics.
 
@@ -188,6 +188,8 @@ This boundary is the model-switching mechanism. No model name, tokenizer, runtim
 2. title
 3. alias
 4. substring
+
+Outer query whitespace is ignored and text is normalized to Unicode NFC before matching.
 
 The old numeric heuristic score was removed. Results expose the match kind instead.
 
