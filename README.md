@@ -1,65 +1,222 @@
-# ctx — FS-First, Markdown-Centric Context Composer
+# ctx
 
-[![Rust](https://github.com/axient/ctx/actions/workflows/rust.yml/badge.svg)](https://github.com/axient/ctx/actions/workflows/rust.yml)
+A minimal local knowledge graph that can explain itself without trusting a model.
 
-ctx는 파일시스템(문서·온톨로지·룰) 기반으로 안정적이고 결정론적인 프롬프트 컨텍스트를 생성합니다. 분류(ontology/rules) → 후보 검색/점수화 → MMR 선택 → 예산 컷 → 템플릿 합성을 단일 바이너리에서 제공합니다.
+It answers three questions deterministically:
 
-**모드**
-- CLI: 로컬 파이프라인/도구 실행
-- MCP: rmcp SDK 기반 stdio 서버 (단일 경로)
-- UI(Tauri + Svelte 5): 문서 뷰어/Prompt 패널/지식/설정 (feature-gated)
+1. **What is connected?**
+2. **What is violated or unknown?**
+3. **Where is the supporting source text?**
 
-**핵심 원칙**
-- FS-First: 문서/온톨로지/룰은 파일로 관리, Git 추적 최적화
-- Deterministic: 동일 입력 → 동일 출력 (정렬/중복/예산 엄격)
-- Secure-by-default: 서버측 렌더링 + sanitizer, 원자 저장(tmp→fsync→rename), 워크스페이스 스코프
+## Canonical workspace
 
-## Install / Run
+```text
+workspace/
+├── schema.yaml
+└── knowledge/
+    ├── release.md
+    ├── privacy.md
+    └── ...
+```
 
-- Build: `cargo build` (release: `cargo build --release`)
-- Run (CLI): `cargo run -- <command> [...args]`
-- Run (MCP): `cargo run -- mcp`
-- Run (UI dev):
-  - Frontend: `cd apps/ui && npm i && npm run dev`
-  - Tauri window: `cargo run --features ui_tauri,ui_ipc,ui_render_rust -- ui`
+There is no authoritative topology file or database. The graph is compiled from Markdown frontmatter on every load.
 
-## CLI Commands (subset)
-- `parse <file> --format yaml|json`
-- `classify <file> --format human|json|yaml`
-- `import <input> [--contexts-dir <dir>] [--interactive]`
-- `index --path <dir> --db <file> [--ontology <file>] [--rules <file>]`
-- `validate <file> --format human|json|yaml`
-- `server --port 3000 --host 127.0.0.1` (feature=http)
-- `mcp` (rmcp SDK stdio server)
+```text
+schema.yaml + knowledge/**/*.md
+              │
+              ▼
+        immutable graph
+              │
+              ▼
+     deterministic validation
+              │
+              ▼
+ Satisfied / Violated / Unknown
+```
 
-## UI (P1)
-- 레이아웃: 좌 Documents / 중앙 Viewer / 우 Prompt(기본) 또는 Ontology/Rules(토글)
-- 상태: SSOT(Single Source Of Truth) `apps/ui/src/lib/ssot.ts`
-- 단축키: ⌘/Ctrl+Enter Generate, P 패널 전환, E 편집 토글, J JSON 메타, ⌘/Ctrl+O 폴더 변경
-- IPC: `select_workspace`, `list_documents`, `read_document`, `update_document`, `compose`, `read_ontology/update_ontology`, `read_rules/update_rules`, `get_settings/set_settings`
-- 렌더링(feature=ui_render_rust): comrak + syntect + ammonia → 안전한 HTML만 WebView로 전달
+## Schema
 
-## Features
-- `mcp_sdk` (default): rmcp 기반 MCP 서버
-- `http`: 경량 HTTP 모드
-- `ui_ipc`: UI IPC 백엔드
-- `ui_render_rust`: 서버측 Markdown→HTML 렌더 + Sanitizer
-- `ui_tauri`: Tauri 창/커맨드 바인딩 (UI 실행)
+Only the constraints needed by the core are supported:
 
-## Testing / Golden
-- Compose goldens: `UPDATE_GOLDEN=1 cargo test -q --test compose_golden`
-- MCP schema goldens: `UPDATE_GOLDEN=1 cargo test -q --test mcp_schema`
-- UI renderer goldens: `UPDATE_GOLDEN=1 cargo test -q --test ui_render_golden --features ui_render_rust`
-- Lint/format: `cargo fmt --check`, `cargo clippy -D warnings`
+- relation domain/range
+- `min` / `max`
+- `acyclic`
+- `symmetric`
 
-## Security / Determinism
-- 경로 정규화·워크스페이스 스코프, 허용 확장자/크기 제한(구성), 원자 저장 루틴 준수
-- 서버측 렌더링 + sanitizer(허용 태그/클래스 최소화), 상대 URL 차단
-- 동일 입력 → 동일 출력, 시계/랜덤 의존 제거
+```yaml
+version: 1
 
-## File Structure
-- 최신 구조는 `docs/FILE_STRUCTURE.md` 참조
+types:
+  Step:
+    constraints:
+      requires:
+        min: 1
+  Artifact: {}
 
-## Contributing
-- PR 전: `cargo test`, `cargo clippy -D warnings`, `cargo fmt --all`
-- CLI/IPC/스키마 변경 시 README와 `docs/`를 갱신하세요
+relations:
+  requires:
+    from: [Step]
+    to: [Artifact]
+    acyclic: true
+```
+
+IDs, type names and relation names are stable machine keys: ASCII letters, digits, `.`, `_`, `:`, and `-`. Human-facing titles and aliases may use any Unicode text.
+
+## Knowledge document
+
+```markdown
+---
+id: step.release
+type: Step
+title: Release
+aliases: [publish]
+
+relations:
+  - relation: requires
+    target: artifact.privacy
+    evidence:
+      - exact: "Publishing requires the privacy notice to be reviewed."
+        prefix: "# Release\n\n"
+        suffix: "\nThe checklist remains blocked."
+        hint:
+          start: 14
+          end: 14
+---
+# Release
+
+Publishing requires the privacy notice to be reviewed.
+The checklist remains blocked.
+```
+
+A relation is an assertion, not inferred truth.
+
+### Evidence selector
+
+`exact` is authoritative. If `prefix` or `suffix` is declared, that context is part of the selector and must still match. When context is omitted, `exact` must resolve to exactly one occurrence. A line `hint` is optional and never authoritative.
+
+Resolution states:
+
+- **valid** — unique quote found.
+- **relocated** — unique quote still exists but moved away from the line hint.
+- **stale** — exact quote no longer exists.
+- **ambiguous** — multiple exact matches cannot be reduced to exactly one by context.
+- **missing** — source file is absent.
+- **invalid** — selector, line hint, path, or UTF-8 source violates the contract.
+
+Markdown YAML frontmatter is excluded from evidence search, so an `exact` value cannot match its own declaration.
+
+Text matching and entity lookup normalize Unicode to NFC. This prevents Korean/macOS NFC/NFD differences from becoming false misses.
+
+## Evidence-carrying validation
+
+`check --json` returns every check as one of:
+
+```text
+Satisfied + satisfaction trace
+Violated  + failure witness
+Unknown   + unresolved evidence
+```
+
+Missing or stale evidence is not silently converted into false or success.
+
+## CLI
+
+```bash
+ctx --workspace ./workspace check
+ctx --workspace ./workspace explain step.release --depth 2
+ctx --workspace ./workspace path step.release artifact.privacy
+ctx --workspace ./workspace query publish
+```
+
+### Optional semantic decision backend
+
+The core does not depend on Laya, TinyJev, Kev, AnyJev, ONNX, MLX, PyTorch, or a vendor server.
+
+When deterministic lookup is ambiguous or empty, `query` can delegate candidate selection to any executable:
+
+```bash
+ctx --workspace ./workspace query "배포 개인정보 문서" \
+  --decider ./my-decision-adapter
+```
+
+Optional adapter arguments can be repeated:
+
+```bash
+ctx query "..." \
+  --decider ./my-adapter \
+  --decider-arg model=laya-ko
+```
+
+The adapter receives one JSON object on stdin:
+
+```json
+{
+  "version": 1,
+  "task": "select_entity",
+  "query": "배포 개인정보 문서",
+  "candidates": [
+    {
+      "id": "artifact.privacy",
+      "kind": "Artifact",
+      "title": "Privacy notice",
+      "aliases": []
+    }
+  ]
+}
+```
+
+It must write exactly one JSON object to stdout:
+
+```json
+{
+  "entity_id": "artifact.privacy",
+  "confidence": 0.91
+}
+```
+
+`entity_id` may be `null`. Confidence is optional, validated to `0..=1`, and is never treated as evidence truth. An adapter cannot select an entity outside the candidate set.
+
+Logs belong on stderr.
+
+This boundary is the model-switching mechanism. No model name, tokenizer, runtime, checkpoint path, or confidence threshold is part of the graph contract. A wrapper may internally use Laya-Ko, TinyJev, Kev, AnyJev, a System One server, or a future local classifier without changing ctx data or public graph semantics.
+
+## Query policy
+
+`query` always uses deterministic lookup first:
+
+1. ID
+2. title
+3. alias
+4. substring
+
+The old numeric heuristic score was removed. Results expose the match kind instead.
+
+A decision adapter is invoked only when deterministic exact lookup does not resolve to one entity. If there is no exact ID/title/alias match, the adapter receives the full entity set; substring matches are display hints and never restrict semantic recall. If several exact matches exist, only that exact ambiguity set is sent.
+
+## Deliberately absent
+
+These are not authoritative core components:
+
+| Mechanism | Add only when |
+| --- | --- |
+| SQLite / FTS5 / BM25 | corpus scanning or lexical recall is a measured bottleneck |
+| vector search | lexical + graph candidate recall fails a frozen evaluation set |
+| Markdown AST | quote selectors cannot express required structural anchors |
+| PageIndex | long documents require hierarchical evidence navigation |
+| model runtime | semantic ambiguity remains after deterministic lookup |
+
+Any future index must be disposable and rebuildable.
+
+## Development
+
+```bash
+cargo fmt --check
+cargo test
+cargo clippy --all-targets -- -D warnings
+cargo run -- --workspace examples check
+cargo run -- --workspace examples explain step.release --depth 2
+cargo run -- --workspace examples path step.release artifact.privacy
+cargo run -- --workspace examples query publish
+```
+
+There is intentionally no CI requirement or generated index.

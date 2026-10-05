@@ -1,0 +1,24 @@
+version: 1
+
+types:
+  Step:
+    constraints:
+      requires:
+        min: 1
+  Artifact: {}
+  Requirement: {}
+
+relations:
+  requires:
+    from: [Step]
+    to: [Artifact]
+    acyclic: true
+
+  supports:
+    from: [Artifact]
+    to: [Requirement]
+
+  related:
+    from: ["*"]
+    to: ["*"]
+    symmetric: true
