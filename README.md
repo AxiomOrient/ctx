@@ -213,12 +213,12 @@ Any future index must be disposable and rebuildable.
 
 ```bash
 cargo fmt --check
-cargo test
-cargo clippy --all-targets -- -D warnings
-cargo run -- --workspace examples check
-cargo run -- --workspace examples explain step.release --depth 2
-cargo run -- --workspace examples path step.release artifact.privacy
-cargo run -- --workspace examples query publish
+cargo test --locked
+cargo clippy --locked --all-targets -- -D warnings
+cargo run --locked -- --workspace examples check
+cargo run --locked -- --workspace examples explain step.release --depth 2
+cargo run --locked -- --workspace examples path step.release artifact.privacy
+cargo run --locked -- --workspace examples query publish
 ```
 
 There is intentionally no CI requirement or generated index.
