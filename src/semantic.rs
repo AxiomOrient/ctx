@@ -1,8 +1,11 @@
 use crate::domain::{CtxError, Entity, GraphSnapshot, QueryMatch, QueryMatchKind, Result};
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::sync::mpsc::{self, RecvTimeoutError};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -63,6 +66,16 @@ pub fn select_entity_with_command(
     query: &str,
     candidates: &[Entity],
 ) -> Result<SemanticDecision> {
+    select_entity_with_command_timeout(program, args, query, candidates, DECIDER_TIMEOUT)
+}
+
+fn select_entity_with_command_timeout(
+    program: &Path,
+    args: &[String],
+    query: &str,
+    candidates: &[Entity],
+    timeout: Duration,
+) -> Result<SemanticDecision> {
     if candidates.is_empty() {
         return Ok(SemanticDecision {
             entity: None,
@@ -85,7 +98,11 @@ pub fn select_entity_with_command(
             .collect(),
     };
 
-    let mut child = Command::new(program)
+    let deadline = Instant::now() + timeout;
+    let mut command = Command::new(program);
+    #[cfg(unix)]
+    command.process_group(0);
+    let mut child = command
         .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -98,42 +115,97 @@ pub fn select_entity_with_command(
             ))
         })?;
 
-    {
-        let mut stdin = child
-            .stdin
-            .take()
-            .ok_or_else(|| CtxError("decision adapter stdin is unavailable".into()))?;
-        serde_json::to_writer(&mut stdin, &request)?;
-        stdin.write_all(b"\n")?;
-    }
+    let stdin = match child.stdin.take() {
+        Some(stdin) => stdin,
+        None => {
+            terminate(&mut child);
+            return Err(CtxError("decision adapter stdin is unavailable".into()));
+        }
+    };
+    let stdout = match child.stdout.take() {
+        Some(stdout) => stdout,
+        None => {
+            terminate(&mut child);
+            return Err(CtxError("decision adapter stdout is unavailable".into()));
+        }
+    };
+    let (writer_tx, writer_rx) = mpsc::channel();
+    let writer = thread::spawn(move || {
+        let mut stdin = stdin;
+        let result = serde_json::to_writer(&mut stdin, &request)
+            .map_err(|error| error.to_string())
+            .and_then(|()| stdin.write_all(b"\n").map_err(|error| error.to_string()));
+        let _ = writer_tx.send(result);
+    });
+    let (reader_tx, reader_rx) = mpsc::channel();
+    let reader = thread::spawn(move || {
+        let _ = reader_tx.send(read_bounded(stdout, DECIDER_MAX_STDOUT_BYTES));
+    });
 
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| CtxError("decision adapter stdout is unavailable".into()))?;
-    let reader = thread::spawn(move || read_bounded(stdout, DECIDER_MAX_STDOUT_BYTES));
-
-    let deadline = Instant::now() + DECIDER_TIMEOUT;
     let status = loop {
-        if let Some(status) = child.try_wait()? {
-            break status;
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) => {}
+            Err(error) => {
+                stop_adapter(&mut child, writer, reader);
+                return Err(CtxError(format!(
+                    "failed to wait for decision adapter '{}': {error}",
+                    program.display()
+                )));
+            }
         }
         if Instant::now() >= deadline {
-            let _ = child.kill();
-            let _ = child.wait();
-            let _ = reader.join();
-            return Err(CtxError(format!(
-                "decision adapter '{}' timed out after {} seconds",
-                program.display(),
-                DECIDER_TIMEOUT.as_secs()
-            )));
+            stop_adapter(&mut child, writer, reader);
+            return Err(timeout_error(program, timeout));
         }
         thread::sleep(DECIDER_POLL_INTERVAL);
     };
 
-    let (stdout, overflowed) = reader
+    let write_result = match writer_rx.recv_timeout(remaining(deadline)) {
+        Ok(result) => result,
+        Err(RecvTimeoutError::Timeout) => {
+            stop_adapter(&mut child, writer, reader);
+            return Err(timeout_error(program, timeout));
+        }
+        Err(RecvTimeoutError::Disconnected) => {
+            stop_adapter(&mut child, writer, reader);
+            return Err(CtxError(
+                "decision adapter stdin writer stopped unexpectedly".into(),
+            ));
+        }
+    };
+    if let Err(error) = write_result {
+        stop_adapter(&mut child, writer, reader);
+        return Err(CtxError(format!(
+            "failed to send request to decision adapter '{}': {error}",
+            program.display()
+        )));
+    }
+
+    let (stdout, overflowed) = match reader_rx.recv_timeout(remaining(deadline)) {
+        Ok(Ok(result)) => result,
+        Ok(Err(error)) => {
+            stop_adapter(&mut child, writer, reader);
+            return Err(error.into());
+        }
+        Err(RecvTimeoutError::Timeout) => {
+            stop_adapter(&mut child, writer, reader);
+            return Err(timeout_error(program, timeout));
+        }
+        Err(RecvTimeoutError::Disconnected) => {
+            stop_adapter(&mut child, writer, reader);
+            return Err(CtxError(
+                "decision adapter stdout reader stopped unexpectedly".into(),
+            ));
+        }
+    };
+
+    writer
         .join()
-        .map_err(|_| CtxError("decision adapter stdout reader panicked".into()))??;
+        .map_err(|_| CtxError("decision adapter stdin writer panicked".into()))?;
+    reader
+        .join()
+        .map_err(|_| CtxError("decision adapter stdout reader panicked".into()))?;
 
     if overflowed {
         return Err(CtxError(format!(
@@ -154,7 +226,6 @@ pub fn select_entity_with_command(
     let response: DecisionResponse = serde_json::from_slice(&stdout)?;
     validate_response(response, candidates)
 }
-
 
 fn read_bounded<R: Read>(mut reader: R, limit: usize) -> std::io::Result<(Vec<u8>, bool)> {
     let mut output = Vec::with_capacity(limit.min(4096));
@@ -180,6 +251,41 @@ fn read_bounded<R: Read>(mut reader: R, limit: usize) -> std::io::Result<(Vec<u8
     }
 
     Ok((output, overflowed))
+}
+
+fn terminate(child: &mut std::process::Child) {
+    #[cfg(unix)]
+    {
+        // SAFETY: `process_group(0)` gives this child a dedicated PGID equal to its PID.
+        // A negative PID targets that group, which also closes inherited stdio held by descendants.
+        unsafe {
+            libc::kill(-(child.id() as libc::pid_t), libc::SIGKILL);
+        }
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+fn stop_adapter(
+    child: &mut std::process::Child,
+    writer: thread::JoinHandle<()>,
+    reader: thread::JoinHandle<()>,
+) {
+    terminate(child);
+    let _ = writer.join();
+    let _ = reader.join();
+}
+
+fn remaining(deadline: Instant) -> Duration {
+    deadline.saturating_duration_since(Instant::now())
+}
+
+fn timeout_error(program: &Path, timeout: Duration) -> CtxError {
+    CtxError(format!(
+        "decision adapter '{}' timed out after {} seconds",
+        program.display(),
+        timeout.as_secs()
+    ))
 }
 
 fn validate_response(
@@ -297,5 +403,87 @@ mod tests {
             &[entity("known")],
         );
         assert!(result.is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn timeout_covers_blocked_request_write() {
+        let error = select_entity_with_command_timeout(
+            Path::new("sh"),
+            &["-c".into(), "exec sleep 5".into()],
+            "query",
+            &large_candidates(),
+            Duration::from_millis(50),
+        )
+        .unwrap_err();
+
+        assert!(error.to_string().contains("timed out"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn drains_large_output_before_adapter_reads_request() {
+        let error = select_entity_with_command_timeout(
+            Path::new("sh"),
+            &[
+                "-c".into(),
+                "head -c 131072 /dev/zero; read request; printf '{\"entity_id\":\"known\"}\\n'"
+                    .into(),
+            ],
+            "query",
+            &large_candidates(),
+            Duration::from_secs(2),
+        )
+        .unwrap_err();
+
+        assert!(error.to_string().contains("exceeded 65536 bytes"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn timeout_kills_descendant_holding_stdout() {
+        let started = Instant::now();
+        let error = select_entity_with_command_timeout(
+            Path::new("sh"),
+            &["-c".into(), "read request; sleep 5 & exit 0".into()],
+            "query",
+            &[entity("known")],
+            Duration::from_millis(100),
+        )
+        .unwrap_err();
+
+        assert!(error.to_string().contains("timed out"));
+        assert!(started.elapsed() < Duration::from_secs(1));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn command_adapter_round_trips_selection() {
+        let decision = select_entity_with_command(
+            Path::new("sh"),
+            &[
+                "-c".into(),
+                r#"read request; printf '{"entity_id":"known","confidence":0.75}\n'"#.into(),
+            ],
+            "query",
+            &[entity("known")],
+        )
+        .unwrap();
+
+        assert_eq!(decision.entity.unwrap().id, "known");
+        assert_eq!(decision.confidence, Some(0.75));
+    }
+
+    #[cfg(unix)]
+    fn large_candidates() -> Vec<Entity> {
+        (0..2048)
+            .map(|index| Entity {
+                id: format!("{index}-{}", "x".repeat(512)),
+                kind: "Thing".into(),
+                title: "Thing".into(),
+                aliases: Vec::new(),
+                document: "knowledge/thing.md".into(),
+            })
+            .collect()
     }
 }

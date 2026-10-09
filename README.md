@@ -216,7 +216,9 @@ stdout에는 한 개의 JSON object만 반환합니다.
 - exact ID/title/alias가 하나면 adapter를 호출하지 않음
 - exact match가 여러 개면 그 집합만 candidate로 전달
 - exact match가 없으면 substring 결과와 무관하게 전체 entity를 candidate로 전달
-- 30초가 지나면 adapter를 종료
+- 30초 기한은 직접 실행한 adapter와 stdin/stdout I/O에 적용
+- Unix에서는 시간 초과 시 adapter와 같은 process group의 후손도 종료
+- process group에서 이탈한 후손과 비 Unix의 후손 종료는 보장하지 않음
 - stdout이 64 KiB를 넘으면 실패
 - 로그는 stderr 사용
 
